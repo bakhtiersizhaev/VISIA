@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 155 50% 3%;
+  /* Deep Dark Emerald/Black */
+  --foreground: 155 10% 97%;
+
+  --card: 155 50% 4%;
+  --card-foreground: 155 10% 97%;
+
+  --popover: 155 50% 4%;
+  --popover-foreground: 155 10% 97%;
+
+  --primary: 0 84% 60%;
+  /* Bright Neon Red */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 155 30% 15%;
+  /* Dark Emerald Accent */
+  --secondary-foreground: 155 10% 97%;
+
+  --muted: 155 30% 10%;
+  --muted-foreground: 155 10% 60%;
+
+  --accent: 155 30% 15%;
+  --accent-foreground: 155 10% 97%;
+
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 155 10% 97%;
+
+  --border: 155 30% 10%;
+  --input: 155 30% 10%;
+  --ring: 0 84% 60%;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
