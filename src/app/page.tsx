@@ -1,12 +1,12 @@
-```
 'use client';
 
 import * as React from 'react';
-import { useState } from 'react'; // Added useState import
 import { fal } from '@fal-ai/client';
+import { Wand2, Loader2 } from 'lucide-react';
 import { AI_MODELS, ModelConfig } from '@/lib/models';
 import { ModelSelector } from '@/components/model-selector';
 import { PromptInput } from '@/components/prompt-input';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import {
@@ -26,14 +26,30 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = React.useState<ModelConfig>(
     AI_MODELS[0]
   );
-  const [prompt, setPrompt] = React.useState('');
+  const [inputValues, setInputValues] = React.useState<Record<string, any>>({});
   const [image, setImage] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [aspectRatio, setAspectRatio] = useState('1:1'); // Added aspectRatio state
+
+  // Initialize default values when model changes
+  React.useEffect(() => {
+    const defaults: Record<string, any> = {};
+    selectedModel.inputParams?.forEach((param) => {
+      if (param.default !== undefined) {
+        defaults[param.name] = param.default;
+      }
+    });
+    setInputValues(defaults);
+  }, [selectedModel]);
+
+  const handleInputChange = (name: string, value: any) => {
+    setInputValues((prev) => ({ ...prev, [name]: value }));
+  };
 
   const generateImage = async () => {
+    const prompt = inputValues['prompt'];
     if (!prompt) return;
+
     setLoading(true);
     setError(null);
     setImage(null);
@@ -41,9 +57,7 @@ export default function Home() {
     try {
       const result: any = await fal.subscribe(selectedModel.id, {
         input: {
-          prompt,
-          aspect_ratio: aspectRatio, // Use state
-          num_images: 1,
+          ...inputValues,
         },
         logs: true,
         onQueueUpdate: (update) => {
@@ -53,12 +67,11 @@ export default function Home() {
         },
       });
 
-      console.log('Fal.ai Result:', result); // DEBUG LOG
+      console.log('Fal.ai Result:', result);
 
       if (result.images && result.images.length > 0) {
         setImage(result.images[0].url);
       } else if (result.data && result.data.images && result.data.images.length > 0) {
-        // Fallback for different response structure
         setImage(result.data.images[0].url);
       } else {
         console.warn('No images found in result:', result);
@@ -72,19 +85,21 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-zinc-50 dark:bg-zinc-950">
+    <main className="flex min-h-screen flex-col items-center bg-background text-foreground">
       {/* Header */}
-      <header className="bg-background/80 sticky top-0 z-50 w-full border-b px-6 py-4 backdrop-blur-xl">
+      <header className="bg-background/80 sticky top-0 z-50 w-full border-b border-border px-6 py-4 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+              <Wand2 className="h-5 w-5" />
+            </div>
             <span className="text-xl font-bold tracking-tight">VISIA</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+            <div className="rounded-full bg-secondary px-3 py-1 text-sm font-medium text-secondary-foreground border border-border">
               💎 100 Tokens
             </div>
-            <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800" />
+            <div className="h-8 w-8 rounded-full bg-secondary border border-border" />
           </div>
         </div>
       </header>
@@ -94,7 +109,7 @@ export default function Home() {
         {/* Controls */}
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
               Create with AI
             </h1>
             <p className="text-muted-foreground">
@@ -102,32 +117,55 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-4 md:flex-row md:items-start">
-            <div className="w-full md:w-1/3 space-y-4">
-              <ModelSelector
-                selectedModel={selectedModel}
-                onSelect={setSelectedModel}
-              />
-              
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Aspect Ratio
+          <div className="flex flex-col gap-8 md:flex-row md:items-start">
+            <div className="w-full md:w-1/3 space-y-6">
+              <div className="space-y-4">
+                <label className="text-sm font-medium leading-none text-muted-foreground">
+                  Model
                 </label>
-                <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select ratio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1:1">Square (1:1)</SelectItem>
-                    <SelectItem value="16:9">Landscape (16:9)</SelectItem>
-                    <SelectItem value="9:16">Portrait (9:16)</SelectItem>
-                    <SelectItem value="4:3">Standard (4:3)</SelectItem>
-                    <SelectItem value="3:4">Portrait (3:4)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <ModelSelector
+                  selectedModel={selectedModel}
+                  onSelect={setSelectedModel}
+                />
               </div>
 
-              <div className="bg-card text-muted-foreground rounded-lg border p-4 text-sm">
+              {/* Dynamic Inputs (excluding prompt) */}
+              {selectedModel.inputParams?.filter(p => p.name !== 'prompt').map((param) => (
+                <div key={param.name} className="space-y-2">
+                  <label className="text-sm font-medium leading-none text-muted-foreground">
+                    {param.label}
+                  </label>
+                  {param.type === 'select' ? (
+                    <Select
+                      value={inputValues[param.name] || param.default || ''}
+                      onValueChange={(val) => handleInputChange(param.name, val)}
+                    >
+                      <SelectTrigger className="bg-secondary/50 border-border">
+                        <SelectValue placeholder={`Select ${param.label}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {param.options?.map((opt) => (
+                          <SelectItem key={opt} value={opt}>
+                            {opt}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="relative">
+                      {/* Fallback for other types if needed */}
+                      <input
+                        type={param.type}
+                        className="flex h-10 w-full rounded-md border border-input bg-secondary/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        value={inputValues[param.name] || ''}
+                        onChange={(e) => handleInputChange(param.name, e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <div className="bg-card/50 text-muted-foreground rounded-lg border border-border p-4 text-sm backdrop-blur-sm">
                 <p className="text-foreground font-medium">
                   {selectedModel.name}
                 </p>
@@ -135,44 +173,72 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="w-full md:w-2/3">
-              <PromptInput
-                value={prompt}
-                onChange={setPrompt}
-                onSubmit={generateImage}
-                loading={loading}
-              />
+            <div className="w-full md:w-2/3 space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none text-muted-foreground">
+                  Prompt
+                </label>
+                <PromptInput
+                  value={inputValues['prompt'] || ''}
+                  onChange={(val) => handleInputChange('prompt', val)}
+                  onSubmit={generateImage}
+                  loading={loading}
+                />
+              </div>
+
+              <Button
+                onClick={generateImage}
+                disabled={loading || !inputValues['prompt']}
+                className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all duration-300"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="mr-2 h-5 w-5" />
+                    Generate Image
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Output Area */}
-        <div className="mt-8 flex min-h-[400px] w-full items-center justify-center rounded-xl border-2 border-dashed bg-zinc-50/50 dark:bg-zinc-900/50">
+        <div className="mt-8 flex min-h-[500px] w-full items-center justify-center rounded-xl border border-border bg-card/30 backdrop-blur-sm relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
           {loading ? (
-            <div className="flex flex-col items-center gap-4">
-              <div className="border-primary h-12 w-12 animate-spin rounded-full border-4 border-t-transparent" />
-              <p className="text-muted-foreground animate-pulse">
-                Generating masterpiece...
+            <div className="flex flex-col items-center gap-4 z-10">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full blur-xl bg-primary/20 animate-pulse" />
+                <div className="relative border-primary h-16 w-16 animate-spin rounded-full border-4 border-t-transparent shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
+              </div>
+              <p className="text-muted-foreground animate-pulse font-medium">
+                Creating your masterpiece...
               </p>
             </div>
           ) : image ? (
-            <div className="relative overflow-hidden rounded-lg shadow-2xl">
+            <div className="relative w-full h-full min-h-[500px] flex items-center justify-center p-4">
               <img
                 src={image}
-                alt={prompt}
-                className="max-h-[600px] w-auto object-contain"
+                alt={inputValues['prompt']}
+                className="max-h-[700px] w-auto object-contain rounded-lg shadow-2xl"
               />
             </div>
           ) : (
-            <div className="text-muted-foreground flex flex-col items-center gap-2">
-              <div className="rounded-full bg-zinc-100 p-4 dark:bg-zinc-800">
-                <span className="text-2xl">✨</span>
+            <div className="text-muted-foreground flex flex-col items-center gap-4 z-10">
+              <div className="rounded-full bg-secondary/50 p-6 border border-border shadow-inner">
+                <Wand2 className="h-8 w-8 opacity-50" />
               </div>
-              <p>Your creation will appear here</p>
+              <p className="text-lg">Your creation will appear here</p>
             </div>
           )}
           {error && (
-            <div className="bg-destructive/10 text-destructive absolute bottom-4 rounded-md px-4 py-2">
+            <div className="bg-destructive/10 text-destructive absolute bottom-4 rounded-md px-4 py-2 border border-destructive/20 backdrop-blur-md">
               {error}
             </div>
           )}
