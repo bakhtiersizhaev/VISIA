@@ -21,12 +21,12 @@ VISIA is a premium AI image generation platform built with Next.js and fal.ai. I
 - **Model Selection:** `ModelSelector` component allows switching between Nano Banana, Seedream, etc.
 - **Dynamic Inputs:** UI automatically adapts to show relevant parameters (Aspect Ratio, Image Size) based on the selected model configuration in `models.ts`.
 - **Dark Theme:** Global "Dark Emerald" theme implemented (`globals.css`), forced dark mode in `layout.tsx`.
+- **Premium UI:** Glassmorphism, glow effects, and gradient backgrounds implemented.
+- **UI Fixes:** Dropdown menus (Model & Aspect Ratio) are now fully functional with solid opaque black backgrounds and correct cursor styles. Selection issues resolved.
 
 ### ⚠️ Known Issues & Blockers
-- **UI Overlap (Z-Index):** Dropdown menus (Select/Popover) are sometimes covered by other elements or have transparency issues, making them unreadable.
-- **Design Quality:** The current design feels outdated ("like an old grandpa's site") and lacks the requested premium feel (glassmorphism, glow effects, better spacing).
-- **Button Visibility:** The "Generate" button was previously hard to see or missing; fixed in code but needs visual verification.
-- **Prompt Input:** Input fields need better styling (glass effect) to match the premium theme.
+- **History:** Generated images are lost on refresh. Need to implement local storage or database persistence.
+- **Error Handling:** Still relies on console logs. Needs UI toasts.
 
 ## 4. Project Structure
 - `src/app/page.tsx`: Main application logic. Handles state (model, prompt, inputs), generation flow, and renders the UI.
@@ -37,16 +37,14 @@ VISIA is a premium AI image generation platform built with Next.js and fal.ai. I
 - `src/app/api/fal/proxy/route.ts`: Secure proxy for fal.ai API calls.
 
 ## 5. Next Steps (To-Do)
-1.  **Fix UI Layering:** Ensure `z-index` for all dropdowns (Select, Popover) is set to `50` and they have a solid, non-transparent background (`bg-popover`) to prevent text overlap.
-2.  **Premium Redesign:**
-    - Implement true glassmorphism (`backdrop-blur`, semi-transparent backgrounds).
-    - Add subtle glow effects (box-shadows) to active elements.
-    - Improve typography and spacing (more "air").
-3.  **Verify Inputs:** Ensure dynamic inputs (Aspect Ratio vs Image Size) render correctly for *every* model and send the correct parameters to the API.
-4.  **Error Handling:** Better visual feedback for errors (toasts instead of just console logs).
+1.  **Image History:** Implement a gallery to save and view previously generated images.
+2.  **Image Upload:** Implement drag-and-drop upload for Image-to-Image models (Nano Banana Edit, Seedream Edit).
+3.  **Error Toasts:** Add `sonner` or `react-hot-toast` for better error feedback.
+4.  **Mobile Responsiveness:** Verify and tweak UI for mobile devices.
 
 ## 6. Context for Next Session
-We stopped while debugging the **UI overlap issue**.
-- **Last Action:** Modified `model-selector.tsx` and `select.tsx` to add `z-50`, `bg-popover`, and `border-border`.
-- **Immediate Goal:** Verify that the dropdowns now appear *on top* of other elements and are fully readable.
-- **User Feedback:** The design needs to be significantly improved ("not like an old man's site"). Focus on aesthetics is critical.
+We successfully fixed the **UI overlap** and implemented the **Premium Redesign**.
+- **Last Action:** Verified generation of a "cute robot" image with the new UI.
+- **Immediate Goal:** Start working on **Image Upload** or **History**.
+- **User Feedback:** The design is now much better ("not like an old man's site").
+

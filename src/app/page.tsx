@@ -87,7 +87,7 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-background text-foreground">
       {/* Header */}
-      <header className="bg-background/80 sticky top-0 z-50 w-full border-b border-border px-6 py-4 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/60 px-6 py-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_15px_rgba(239,68,68,0.5)]">
@@ -140,7 +140,7 @@ export default function Home() {
                       value={inputValues[param.name] || param.default || ''}
                       onValueChange={(val) => handleInputChange(param.name, val)}
                     >
-                      <SelectTrigger className="bg-secondary/50 border-border">
+                      <SelectTrigger className="border-white/10 bg-white/5 backdrop-blur-sm transition-colors hover:bg-white/10 focus:ring-primary/50">
                         <SelectValue placeholder={`Select ${param.label}`} />
                       </SelectTrigger>
                       <SelectContent>
@@ -156,7 +156,7 @@ export default function Home() {
                       {/* Fallback for other types if needed */}
                       <input
                         type={param.type}
-                        className="flex h-10 w-full rounded-md border border-input bg-secondary/50 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-foreground backdrop-blur-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:bg-white/10"
                         value={inputValues[param.name] || ''}
                         onChange={(e) => handleInputChange(param.name, e.target.value)}
                       />
@@ -165,11 +165,11 @@ export default function Home() {
                 </div>
               ))}
 
-              <div className="bg-card/50 text-muted-foreground rounded-lg border border-border p-4 text-sm backdrop-blur-sm">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-md transition-all hover:bg-white/10">
                 <p className="text-foreground font-medium">
                   {selectedModel.name}
                 </p>
-                <p className="mt-1">{selectedModel.description}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{selectedModel.description}</p>
               </div>
             </div>
 
@@ -189,19 +189,22 @@ export default function Home() {
               <Button
                 onClick={generateImage}
                 disabled={loading || !inputValues['prompt']}
-                className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all duration-300"
+                className="group relative h-14 w-full overflow-hidden rounded-xl bg-gradient-to-r from-red-600 to-orange-600 text-lg font-bold text-white shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(220,38,38,0.7)] disabled:opacity-50"
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="mr-2 h-5 w-5" />
-                    Generate Image
-                  </>
-                )}
+                <div className="absolute inset-0 bg-white/20 opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="relative flex items-center justify-center gap-2">
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="mr-2 h-5 w-5" />
+                      Generate Image
+                    </>
+                  )}
+                </div>
               </Button>
             </div>
           </div>
