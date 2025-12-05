@@ -1,8 +1,10 @@
 export interface ModelConfig {
   id: string;
+  editId?: string;
   name: string;
   type: 'text-to-image' | 'image-to-image' | 'edit';
   description: string;
+  basePriceUsd?: number; // base model price (fal) if known
   inputParams?: {
     name: string;
     type: 'text' | 'number' | 'select';
@@ -17,13 +19,15 @@ export interface ModelConfig {
 export const AI_MODELS: ModelConfig[] = [
   {
     id: 'fal-ai/nano-banana',
+    editId: 'fal-ai/nano-banana/edit',
     name: 'Nano Banana',
     type: 'text-to-image',
-    description: 'Fast and cost-effective generation.',
+    description: 'Fast and cost-effective generation. Edit version will be used when you add a reference image.',
+    basePriceUsd: 0.004,
     inputParams: [
       { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
-        name: 'aspect_ratio', // FIXED: was image_size
+        name: 'aspect_ratio',
         type: 'select',
         label: 'Aspect Ratio',
         options: [
@@ -41,13 +45,16 @@ export const AI_MODELS: ModelConfig[] = [
         default: '1:1',
       },
       { name: 'num_images', type: 'number', label: 'Number of Images', default: 1 },
+      { name: 'image_url', type: 'text', label: 'Reference Image (optional)' },
     ],
   },
   {
     id: 'fal-ai/nano-banana-pro',
+    editId: 'fal-ai/nano-banana-pro/edit',
     name: 'Nano Banana Pro',
     type: 'text-to-image',
-    description: 'High-quality generation with resolution control.',
+    description: 'High-quality generation with resolution control. Edit version will be used when reference images are provided.',
+    basePriceUsd: 0.008,
     inputParams: [
       { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
@@ -76,53 +83,21 @@ export const AI_MODELS: ModelConfig[] = [
         default: '1K',
       },
       { name: 'num_images', type: 'number', label: 'Number of Images', default: 1 },
-    ],
-  },
-  {
-    id: 'fal-ai/nano-banana/edit',
-    name: 'Nano Banana (Edit)',
-    type: 'edit',
-    description: 'Edit images with Nano Banana.',
-    inputParams: [
-      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
-      { name: 'image_url', type: 'text', label: 'Image URL', required: true },
-      {
-        name: 'aspect_ratio', // Assuming edit also supports aspect_ratio or output size, but usually edit keeps original or uses mask. Keeping simple for now.
-        type: 'select',
-        label: 'Output Ratio',
-        options: ['1:1', '16:9', '9:16', '4:3', '3:4'],
-        default: '1:1',
-      },
-    ],
-  },
-  {
-    id: 'fal-ai/nano-banana-pro/edit',
-    name: 'Nano Banana Pro (Edit)',
-    type: 'edit',
-    description: 'Advanced editing with multiple inputs.',
-    inputParams: [
-      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
         name: 'image_urls',
         type: 'text',
-        label: 'Reference Images',
-        required: true,
+        label: 'Reference Images (optional)',
         multiple: true
-      },
-      {
-        name: 'aspect_ratio',
-        type: 'select',
-        label: 'Output Ratio',
-        options: ['1:1', '16:9', '9:16', '4:3', '3:4'],
-        default: '1:1',
       },
     ],
   },
   {
     id: 'fal-ai/bytedance/seedream/v4.5/text-to-image',
+    editId: 'fal-ai/bytedance/seedream/v4.5/edit',
     name: 'Seedream 4.5',
     type: 'text-to-image',
-    description: "ByteDance's generation model.",
+    description: "ByteDance's generation model. Edit version will be used when reference images are provided.",
+    basePriceUsd: 0.012,
     inputParams: [
       { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
@@ -141,37 +116,11 @@ export const AI_MODELS: ModelConfig[] = [
         ],
         default: 'square_hd',
       },
-    ],
-  },
-  {
-    id: 'fal-ai/bytedance/seedream/v4.5/edit',
-    name: 'Seedream 4.5 (Edit)',
-    type: 'edit',
-    description: 'Edit images with Seedream.',
-    inputParams: [
-      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
         name: 'image_urls',
         type: 'text',
-        label: 'Reference Images',
-        required: true,
+        label: 'Reference Images (optional)',
         multiple: true
-      },
-      {
-        name: 'image_size',
-        type: 'select',
-        label: 'Output Size',
-        options: [
-          'square_hd',
-          'square',
-          'portrait_4_3',
-          'portrait_16_9',
-          'landscape_4_3',
-          'landscape_16_9',
-          'auto_2K',
-          'auto_4K'
-        ],
-        default: 'square_hd',
       },
     ],
   },
@@ -180,6 +129,7 @@ export const AI_MODELS: ModelConfig[] = [
     name: 'ImagineArt 1.5',
     type: 'text-to-image',
     description: 'High-fidelity visuals.',
+    basePriceUsd: 0.01,
     inputParams: [
       { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {

@@ -58,8 +58,8 @@ export async function middleware(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    // Protect the home page
-    if (!user && request.nextUrl.pathname === '/') {
+    // Protect account and private areas, but allow landing on /
+    if (!user && request.nextUrl.pathname.startsWith('/account')) {
         return NextResponse.redirect(new URL('/login', request.url))
     }
 

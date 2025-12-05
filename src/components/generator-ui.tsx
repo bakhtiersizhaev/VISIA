@@ -14,12 +14,14 @@ import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
-type InputValue = string | number | string[] | null | undefined;
+type InputValue = string | number | string[] | File | File[] | null | undefined;
 type FalImage = { url: string };
 type FalResponse = { images?: FalImage[]; data?: { images?: FalImage[] } };
 type FalQueueUpdate = { status?: string; logs?: { message?: string | null | undefined }[] };
 
-// Обращаемся к fal.ai через прокси, чтобы не течь ключами с клиента.
+const USD_PER_TOKEN = 0.01;
+
+// Using fal.ai via proxy to avoid leaking keys.
 fal.config({
     proxyUrl: '/api/fal/proxy',
 });
@@ -39,8 +41,28 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
     const [elapsedTime, setElapsedTime] = React.useState(0);
     const [previewOpen, setPreviewOpen] = React.useState(false);
     const [previewSrc, setPreviewSrc] = React.useState<string | null>(null);
+    const [tokenBalance, setTokenBalance] = React.useState<number | null>(null);
 
     const supabase = createClient();
+
+    // Sync user profile and balance
+    React.useEffect(() => {
+        const syncUser = async () => {
+            await supabase.from('users').upsert({
+                id: user.id,
+                email: user.email || '',
+            });
+            const { data, error } = await supabase
+                .from('users')
+                .select('token_balance')
+                .eq('id', user.id)
+                .maybeSingle();
+            if (!error && data) {
+                setTokenBalance(data.token_balance);
+            }
+        };
+        syncUser();
+    }, [supabase, user.email, user.id]);
 
     // Load history from Supabase
     React.useEffect(() => {
@@ -116,13 +138,33 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
 
     // Initialize default values when model changes
     React.useEffect(() => {
-        const defaults: Record<string, InputValue> = {};
-        selectedModel.inputParams?.forEach((param) => {
-            if (param.default !== undefined) {
-                defaults[param.name] = param.default;
-            }
+        setInputValues((prev) => {
+            const next: Record<string, InputValue> = {};
+            selectedModel.inputParams?.forEach((param) => {
+                let carry: InputValue | undefined = prev[param.name];
+
+                if (carry === undefined && param.name === 'image_urls' && prev['image_url'] !== undefined) {
+                    const src = prev['image_url'];
+                    carry = Array.isArray(src) ? src : src ? [src] : [];
+                }
+
+                if (carry === undefined && param.name === 'image_url' && prev['image_urls'] !== undefined) {
+                    const src = prev['image_urls'];
+                    if (Array.isArray(src) && src.length > 0) {
+                        carry = src[0];
+                    }
+                }
+
+                if (carry !== undefined) {
+                    next[param.name] = carry;
+                } else if (param.default !== undefined) {
+                    next[param.name] = param.default;
+                } else {
+                    next[param.name] = '';
+                }
+            });
+            return next;
         });
-        setInputValues(defaults);
     }, [selectedModel]);
 
     const handleInputChange = (name: string, value: InputValue) => {
@@ -155,6 +197,36 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         const promptValue = inputValues['prompt'];
         if (typeof promptValue !== 'string' || !promptValue.trim()) return;
         const prompt = promptValue.trim();
+        const hasRef =
+            Boolean(inputValues['image_url']) ||
+            (Array.isArray(inputValues['image_urls']) && inputValues['image_urls'].length > 0);
+        const modelIdToUse = selectedModel.editId && hasRef ? selectedModel.editId : selectedModel.id;
+
+        const uploadReferences = async () => {
+            const uploads: Record<string, string | string[] | undefined> = {};
+
+            const single = inputValues['image_url'];
+            if (single instanceof File) {
+                uploads.image_url = await fal.storage.upload(single);
+            } else if (typeof single === 'string' && single) {
+                uploads.image_url = single;
+            }
+
+            const multi = inputValues['image_urls'];
+            if (Array.isArray(multi)) {
+                const urls: string[] = [];
+                for (const item of multi) {
+                    if (item instanceof File) {
+                        urls.push(await fal.storage.upload(item));
+                    } else if (typeof item === 'string' && item) {
+                        urls.push(item);
+                    }
+                }
+                if (urls.length) uploads.image_urls = urls;
+            }
+
+            return uploads;
+        };
 
         setLoading(true);
         setError(null);
@@ -167,9 +239,22 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         });
 
         try {
-            const result = await fal.subscribe(selectedModel.id, {
+            const uploadedRefs = await uploadReferences();
+            const inputPayload: Record<string, InputValue> = {
+                ...inputValues,
+                ...uploadedRefs,
+            };
+            if (modelIdToUse.includes('/edit')) {
+                delete inputPayload.num_images;
+                delete inputPayload.resolution;
+            } else {
+                delete inputPayload.image_url;
+                delete inputPayload.image_urls;
+            }
+
+            const result = await fal.subscribe(modelIdToUse, {
                 input: {
-                    ...inputValues,
+                    ...inputPayload,
                 },
                 logs: true,
                 onQueueUpdate: (update: FalQueueUpdate) => {
@@ -196,11 +281,11 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
             if (parsed.images && parsed.images.length > 0) {
                 const imageUrl = parsed.images[0].url;
                 setImage(imageUrl);
-                addToHistory(imageUrl, prompt, selectedModel.id);
+                addToHistory(imageUrl, prompt, modelIdToUse);
             } else if (parsed.data && parsed.data.images && parsed.data.images.length > 0) {
                 const imageUrl = parsed.data.images[0].url;
                 setImage(imageUrl);
-                addToHistory(imageUrl, prompt, selectedModel.id);
+                addToHistory(imageUrl, prompt, modelIdToUse);
             } else {
                 console.warn('No images found in result:', result);
             }
@@ -224,10 +309,14 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
             setLoading(false);
         }
     };
-
     const handleLogout = async () => {
         await supabase.auth.signOut();
         window.location.href = '/login';
+    };
+
+    const getPrice = () => {
+        if (!selectedModel.basePriceUsd || USD_PER_TOKEN <= 0) return null;
+        return Number(((selectedModel.basePriceUsd * 1.2) / USD_PER_TOKEN).toFixed(2));
     };
 
     return (
@@ -241,14 +330,14 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                         </div>
                         <span className="text-xl font-bold tracking-tight">VISIA</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <HistorySheet history={history} onClear={clearHistory} />
-                        <div className="rounded-full bg-secondary px-3 py-1 text-sm font-medium text-secondary-foreground border border-border">
-                            💎 100 Tokens
-                        </div>
-                        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
-                            Log Out
-                        </Button>
+                        <div className="flex items-center gap-4">
+                            <HistorySheet history={history} onClear={clearHistory} />
+                            <div className="rounded-full bg-secondary px-3 py-1 text-sm font-medium text-secondary-foreground border border-border">
+                                {tokenBalance ?? '...'} Tokens
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
+                                Log Out
+                            </Button>
                         <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-purple-600 border border-border" />
                     </div>
                 </div>
@@ -367,6 +456,11 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                                     )}
                                 </div>
                             </Button>
+                                {getPrice() !== null && (
+                                    <p className="text-xs text-muted-foreground text-right">
+                                        Estimate: {getPrice()} tokens
+                                    </p>
+                                )}
                         </div>
                     </div>
                 </div>
@@ -410,14 +504,14 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                                     type="button"
                                     className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white border border-white/15 shadow-sm transition hover:bg-black/80"
                                     onClick={() => openPreview(image)}
-                                    aria-label="Открыть превью"
+                                    aria-label="Open preview"
                                 >
                                     <ZoomIn className="h-4 w-4" />
                                 </button>
                                 <button
                                     type="button"
                                     className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black border border-white/30 shadow-sm transition hover:bg-white/90"
-                                    aria-label="Скачать изображение"
+                                    aria-label="Download image"
                                     onClick={() => handleDownload(image)}
                                 >
                                     <Download className="h-4 w-4" />
@@ -459,3 +553,4 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         </main>
     );
 }
+

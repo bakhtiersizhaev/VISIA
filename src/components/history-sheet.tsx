@@ -122,7 +122,7 @@ export function HistorySheet({ history, onClear, onSelect }: HistorySheetProps) 
                                                         setPreviewSrc(item.url);
                                                         setPreviewOpen(true);
                                                     }}
-                                                    aria-label="Открыть превью"
+                                                    aria-label="Open preview"
                                                 >
                                                     <ZoomIn className="h-4 w-4" />
                                                 </button>
@@ -133,7 +133,7 @@ export function HistorySheet({ history, onClear, onSelect }: HistorySheetProps) 
                                                     downloadImage(item.url);
                                                 }}
                                                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black border border-white/20 shadow-sm hover:bg-white/90"
-                                                aria-label="Скачать"
+                                                aria-label="Download"
                                             >
                                                 <Download className="h-4 w-4" />
                                                 </button>

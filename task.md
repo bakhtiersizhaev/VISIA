@@ -11,10 +11,10 @@
 ## Phase 2: Infrastructure & Auth
 
 - [ ] **Supabase Setup** <!-- id: 6 -->
-  - [ ] Create Supabase project (User to do this). <!-- id: 7 -->
-  - [ ] Connect Supabase to Next.js (Env vars). <!-- id: 8 -->
-  - [ ] Implement Google Auth with Supabase Auth UI / Custom UI. <!-- id: 9 -->
-  - [ ] Create `users` table in DB (id, email, token_balance). <!-- id: 10 -->
+  - [x] Create Supabase project (User to do this). <!-- id: 7 -->
+  - [x] Connect Supabase to Next.js (Env vars). <!-- id: 8 -->
+  - [x] Implement Google Auth with Supabase Auth UI / Custom UI. <!-- id: 9 -->
+  - [x] Create `users` table in DB (id, email, token_balance). <!-- id: 10 -->
 
 ## Phase 3: Core UI (Vibecoding)
 
@@ -24,8 +24,8 @@
 - [ ] **Generation Interface** <!-- id: 14 -->
   - [x] Create `ModelSelector` component (Visual cards for models). <!-- id: 15 -->
   - [x] Create `PromptInput` component (Textarea with auto-resize). <!-- id: 16 -->
-  - [ ] Create `ImageUploader` component (Drag & drop, preview). <!-- id: 17 -->
-  - [ ] Create `SettingsPanel` (Aspect ratio, count). <!-- id: 18 -->
+  - [x] Create `ImageUploader` component (Drag & drop, preview). <!-- id: 17 -->
+  - [x] Create `SettingsPanel` (Aspect ratio, count). <!-- id: 18 -->
 
 ## Phase 4: AI Integration (fal.ai)
 
@@ -34,7 +34,7 @@
 - [ ] **Frontend Logic** <!-- id: 21 -->
   - [x] Implement `useGeneration` hook (handles loading, error, success). <!-- id: 22 -->
   - [x] Connect `Text-to-Image` flow (Flux/SDXL). <!-- id: 23 -->
-  - [ ] Connect `Image-to-Image` flow. <!-- id: 24 -->
+  - [x] Connect `Image-to-Image` flow. <!-- id: 24 -->
 
 ## Phase 5: Polish & Launch
 
