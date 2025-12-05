@@ -8,7 +8,7 @@ export interface ModelConfig {
     type: 'text' | 'number' | 'select';
     label: string;
     required?: boolean;
-    default?: any;
+    default?: string | number | boolean | null;
     options?: string[];
     multiple?: boolean; // New property for multi-file upload
   }[];
@@ -150,7 +150,13 @@ export const AI_MODELS: ModelConfig[] = [
     description: 'Edit images with Seedream.',
     inputParams: [
       { name: 'prompt', type: 'text', label: 'Prompt', required: true },
-      { name: 'image_url', type: 'text', label: 'Image URL', required: true },
+      {
+        name: 'image_urls',
+        type: 'text',
+        label: 'Reference Images',
+        required: true,
+        multiple: true
+      },
       {
         name: 'image_size',
         type: 'select',
@@ -161,7 +167,9 @@ export const AI_MODELS: ModelConfig[] = [
           'portrait_4_3',
           'portrait_16_9',
           'landscape_4_3',
-          'landscape_16_9'
+          'landscape_16_9',
+          'auto_2K',
+          'auto_4K'
         ],
         default: 'square_hd',
       },

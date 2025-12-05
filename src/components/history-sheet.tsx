@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { History, Trash2, Copy, Check } from 'lucide-react';
+import { History, Trash2, Copy, Check, Download, ZoomIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Sheet,
@@ -11,8 +11,7 @@ import {
     SheetTitle,
     SheetTrigger,
 } from '@/components/ui/sheet';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export interface HistoryItem {
     id: string;
@@ -30,6 +29,25 @@ interface HistorySheetProps {
 
 export function HistorySheet({ history, onClear, onSelect }: HistorySheetProps) {
     const [copiedId, setCopiedId] = React.useState<string | null>(null);
+    const [previewOpen, setPreviewOpen] = React.useState(false);
+    const [previewSrc, setPreviewSrc] = React.useState<string | null>(null);
+
+    const downloadImage = async (url: string) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = 'image.png';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(objectUrl);
+        } catch (e) {
+            console.error('Download failed', e);
+        }
+    };
 
     const copyPrompt = (e: React.MouseEvent, text: string, id: string) => {
         e.stopPropagation();
@@ -39,88 +57,130 @@ export function HistorySheet({ history, onClear, onSelect }: HistorySheetProps) 
     };
 
     return (
-        <Sheet>
-            <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                    <History className="h-5 w-5" />
-                    {history.length > 0 && (
-                        <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                            {history.length}
-                        </span>
-                    )}
-                </Button>
-            </SheetTrigger>
-            <SheetContent className="w-full sm:max-w-md bg-zinc-950 border-l border-white/10">
-                <SheetHeader>
-                    <div className="flex items-center justify-between">
-                        <SheetTitle>History</SheetTitle>
+        <>
+            <Sheet>
+                <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative">
+                        <History className="h-5 w-5" />
                         {history.length > 0 && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={onClear}
-                                className="text-muted-foreground hover:text-destructive"
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Clear
-                            </Button>
+                            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                                {history.length}
+                            </span>
+                        )}
+                    </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-md bg-zinc-950 border-l border-white/10">
+                    <SheetHeader>
+                        <div className="flex items-center justify-between">
+                            <SheetTitle>History</SheetTitle>
+                            {history.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onClear}
+                                    className="text-muted-foreground hover:text-destructive"
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Clear
+                                </Button>
+                            )}
+                        </div>
+                        <SheetDescription>
+                            Your recent generations. Click to view or copy prompt.
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <div className="mt-6 h-[calc(100vh-10rem)] overflow-y-auto pr-2 custom-scrollbar">
+                        {history.length === 0 ? (
+                            <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
+                                <History className="mb-4 h-12 w-12 opacity-20" />
+                                <p>No history yet</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {history.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="group relative flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-3 transition-colors hover:bg-white/10"
+                                        onClick={() => onSelect?.(item)}
+                                        role={onSelect ? 'button' : undefined}
+                                        tabIndex={onSelect ? 0 : undefined}
+                                    >
+                                        <div className="relative aspect-square w-full overflow-hidden rounded-md bg-black/20">
+                                            <img
+                                                src={item.url}
+                                                alt={item.prompt}
+                                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                                loading="lazy"
+                                            />
+                                            <div className="absolute right-2 top-2 flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                                                <button
+                                                    type="button"
+                                                    className="flex h-8 w-8 items-center justify-center rounded-full bg-black/70 text-white border border-white/10 shadow-sm hover:bg-black/85"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPreviewSrc(item.url);
+                                                        setPreviewOpen(true);
+                                                    }}
+                                                    aria-label="Открыть превью"
+                                                >
+                                                    <ZoomIn className="h-4 w-4" />
+                                                </button>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    downloadImage(item.url);
+                                                }}
+                                                className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black border border-white/20 shadow-sm hover:bg-white/90"
+                                                aria-label="Скачать"
+                                            >
+                                                <Download className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <p className="line-clamp-2 text-sm text-foreground/90 font-medium">
+                                                    {item.prompt}
+                                                </p>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                                                    onClick={(e) => copyPrompt(e, item.prompt, item.id)}
+                                                >
+                                                    {copiedId === item.id ? (
+                                                        <Check className="h-3 w-3 text-green-500" />
+                                                    ) : (
+                                                        <Copy className="h-3 w-3" />
+                                                    )}
+                                                </Button>
+                                            </div>
+                                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                <span>{item.modelId.split('/').pop()}</span>
+                                                <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         )}
                     </div>
-                    <SheetDescription>
-                        Your recent generations. Click to view or copy prompt.
-                    </SheetDescription>
-                </SheetHeader>
+                </SheetContent>
+            </Sheet>
 
-                <div className="mt-6 h-[calc(100vh-10rem)] overflow-y-auto pr-2 custom-scrollbar">
-                    {history.length === 0 ? (
-                        <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-                            <History className="mb-4 h-12 w-12 opacity-20" />
-                            <p>No history yet</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {history.map((item) => (
-                                <div
-                                    key={item.id}
-                                    className="group relative flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 p-3 transition-colors hover:bg-white/10"
-                                >
-                                    <div className="relative aspect-square w-full overflow-hidden rounded-md bg-black/20">
-                                        <img
-                                            src={item.url}
-                                            alt={item.prompt}
-                                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                            loading="lazy"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <p className="line-clamp-2 text-sm text-foreground/90 font-medium">
-                                                {item.prompt}
-                                            </p>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
-                                                onClick={(e) => copyPrompt(e, item.prompt, item.id)}
-                                            >
-                                                {copiedId === item.id ? (
-                                                    <Check className="h-3 w-3 text-green-500" />
-                                                ) : (
-                                                    <Copy className="h-3 w-3" />
-                                                )}
-                                            </Button>
-                                        </div>
-                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                            <span>{item.modelId.split('/').pop()}</span>
-                                            <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+            <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                <DialogContent className="max-w-4xl bg-black/90 border border-white/10">
+                    {previewSrc && (
+                        <img
+                            src={previewSrc}
+                            alt="Preview"
+                            className="w-full h-full max-h-[80vh] object-contain rounded-lg"
+                        />
                     )}
-                </div>
-            </SheetContent>
-        </Sheet>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

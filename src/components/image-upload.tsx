@@ -1,11 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Upload, X, Loader2 } from 'lucide-react';
+import { Upload, X, Loader2, Download, ZoomIn } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { fal } from '@fal-ai/client';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 interface ImageUploadProps {
     value?: string | string[];
@@ -17,6 +18,25 @@ interface ImageUploadProps {
 export function ImageUpload({ value, onChange, className, multiple = false }: ImageUploadProps) {
     const [uploading, setUploading] = React.useState(false);
     const [error, setError] = React.useState<string | null>(null);
+    const [previewOpen, setPreviewOpen] = React.useState(false);
+    const [previewSrc, setPreviewSrc] = React.useState<string | null>(null);
+
+    const downloadImage = async (url: string) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = 'image.png';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(objectUrl);
+        } catch (e) {
+            console.error('Download failed', e);
+        }
+    };
 
     const handleUpload = React.useCallback(
         async (files: File[]) => {
@@ -35,7 +55,7 @@ export function ImageUpload({ value, onChange, className, multiple = false }: Im
                 } else {
                     onChange(urls[0]);
                 }
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error('Upload error:', err);
                 setError('Failed to upload image');
             } finally {
@@ -110,14 +130,39 @@ export function ImageUpload({ value, onChange, className, multiple = false }: Im
                                 alt={`Uploaded ${idx}`}
                                 className="h-full w-full object-cover rounded-md border border-white/10"
                             />
-                            <Button
-                                variant="destructive"
-                                size="icon"
-                                className="absolute right-1 top-1 h-5 w-5 rounded-full opacity-80 hover:opacity-100"
-                                onClick={(e) => clearImage(e, idx)}
-                            >
-                                <X className="h-3 w-3" />
-                            </Button>
+                            <div className="absolute right-1 top-1 flex gap-1">
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPreviewSrc(url);
+                                        setPreviewOpen(true);
+                                    }}
+                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white border border-white/10 shadow-sm transition hover:bg-black/85"
+                                    aria-label="Открыть превью"
+                                >
+                                    <ZoomIn className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        downloadImage(url);
+                                    }}
+                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-black border border-white/20 shadow-sm transition hover:bg-white/90"
+                                    aria-label="Скачать"
+                                >
+                                    <Download className="h-3.5 w-3.5" />
+                                </button>
+                                <Button
+                                    variant="destructive"
+                                    size="icon"
+                                    className="h-7 w-7 rounded-full opacity-90 hover:opacity-100"
+                                    onClick={(e) => clearImage(e, idx)}
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </Button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -132,14 +177,39 @@ export function ImageUpload({ value, onChange, className, multiple = false }: Im
                         alt="Uploaded"
                         className="h-full max-h-[200px] w-full object-contain rounded-md"
                     />
-                    <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute right-2 top-2 h-6 w-6 rounded-full"
-                        onClick={(e) => clearImage(e)}
-                    >
-                        <X className="h-3 w-3" />
-                    </Button>
+                    <div className="absolute right-2 top-2 flex gap-1">
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewSrc(value);
+                                setPreviewOpen(true);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white border border-white/10 shadow-sm transition hover:bg-black/85"
+                            aria-label="Открыть превью"
+                        >
+                            <ZoomIn className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                downloadImage(value);
+                            }}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-black border border-white/20 shadow-sm transition hover:bg-white/90"
+                            aria-label="Скачать"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                        </button>
+                        <Button
+                            variant="destructive"
+                            size="icon"
+                            className="h-7 w-7 rounded-full"
+                            onClick={(e) => clearImage(e)}
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
                 </div>
             );
         }
@@ -184,6 +254,18 @@ export function ImageUpload({ value, onChange, className, multiple = false }: Im
                 )}
             </div>
             {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+
+            <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+                <DialogContent className="max-w-3xl bg-black/90 border border-white/10">
+                    {previewSrc && (
+                        <img
+                            src={previewSrc}
+                            alt="Preview"
+                            className="w-full h-full max-h-[70vh] object-contain rounded-lg"
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

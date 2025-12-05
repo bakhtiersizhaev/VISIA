@@ -2,15 +2,14 @@
 
 import * as React from 'react';
 import { fal } from '@fal-ai/client';
-import { Wand2, Loader2 } from 'lucide-react';
+import { Wand2, Loader2, Download, ZoomIn } from 'lucide-react';
 import { AI_MODELS, ModelConfig } from '@/lib/models';
 import { ModelSelector } from '@/components/model-selector';
 import { PromptInput } from '@/components/prompt-input';
 import { ImageUpload } from '@/components/image-upload';
 import { HistorySheet, HistoryItem } from '@/components/history-sheet';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -18,6 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+
+type InputValue = string | number | string[] | null | undefined;
+type FalImage = { url: string };
+type FalResponse = { images?: FalImage[]; data?: { images?: FalImage[] } };
+type FalQueueUpdate = { status?: string; logs?: { message?: string | null | undefined }[] };
 
 // Configure fal.ai to use the proxy
 fal.config({
@@ -28,11 +32,15 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = React.useState<ModelConfig>(
     AI_MODELS[0]
   );
-  const [inputValues, setInputValues] = React.useState<Record<string, any>>({});
+  const [inputValues, setInputValues] = React.useState<Record<string, InputValue>>({});
   const [image, setImage] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [history, setHistory] = React.useState<HistoryItem[]>([]);
+  const [logs, setLogs] = React.useState<string[]>([]);
+  const [elapsedTime, setElapsedTime] = React.useState(0);
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [previewSrc, setPreviewSrc] = React.useState<string | null>(null);
 
   // Load history from localStorage
   React.useEffect(() => {
@@ -50,6 +58,19 @@ export default function Home() {
   React.useEffect(() => {
     localStorage.setItem('visia_history', JSON.stringify(history));
   }, [history]);
+
+  // Timer effect
+  React.useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (loading) {
+      const startTime = Date.now();
+      setElapsedTime(0);
+      interval = setInterval(() => {
+        setElapsedTime((Date.now() - startTime) / 1000);
+      }, 50); // Update frequently for smooth timer
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
 
   const addToHistory = (url: string, prompt: string, modelId: string) => {
     const newItem: HistoryItem = {
@@ -69,7 +90,7 @@ export default function Home() {
 
   // Initialize default values when model changes
   React.useEffect(() => {
-    const defaults: Record<string, any> = {};
+    const defaults: Record<string, InputValue> = {};
     selectedModel.inputParams?.forEach((param) => {
       if (param.default !== undefined) {
         defaults[param.name] = param.default;
@@ -78,47 +99,103 @@ export default function Home() {
     setInputValues(defaults);
   }, [selectedModel]);
 
-  const handleInputChange = (name: string, value: any) => {
+  const handleInputChange = (name: string, value: InputValue) => {
     setInputValues((prev) => ({ ...prev, [name]: value }));
   };
 
+  const openPreview = (url: string) => {
+    setPreviewSrc(url);
+    setPreviewOpen(true);
+  };
+
+  const handleDownload = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = 'image.png';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (e) {
+      console.error('Download failed', e);
+    }
+  };
+
   const generateImage = async () => {
-    const prompt = inputValues['prompt'];
-    if (!prompt) return;
+    const promptValue = inputValues['prompt'];
+    if (typeof promptValue !== 'string' || !promptValue.trim()) return;
+    const prompt = promptValue.trim();
 
     setLoading(true);
     setError(null);
     setImage(null);
+    setLogs([]);
+
+    console.log('Generating with inputs:', {
+      model: selectedModel.id,
+      inputs: inputValues
+    });
 
     try {
-      const result: any = await fal.subscribe(selectedModel.id, {
+      const result = await fal.subscribe(selectedModel.id, {
         input: {
           ...inputValues,
         },
         logs: true,
-        onQueueUpdate: (update) => {
+        onQueueUpdate: (update: FalQueueUpdate) => {
           if (update.status === 'IN_PROGRESS') {
-            console.log('Queue update:', update.logs);
+            if (update.logs && update.logs.length) {
+              const newLogs = update.logs
+                .map((l) => l.message)
+                .filter((msg): msg is string => Boolean(msg));
+              if (newLogs.length) {
+                setLogs((prev) => [
+                  ...prev,
+                  ...newLogs
+                ]);
+              }
+            }
           }
         },
       });
 
       console.log('Fal.ai Result:', result);
 
-      if (result.images && result.images.length > 0) {
-        const imageUrl = result.images[0].url;
+      const parsed = result as FalResponse;
+
+      if (parsed.images && parsed.images.length > 0) {
+        const imageUrl = parsed.images[0].url;
         setImage(imageUrl);
         addToHistory(imageUrl, prompt, selectedModel.id);
-      } else if (result.data && result.data.images && result.data.images.length > 0) {
-        const imageUrl = result.data.images[0].url;
+      } else if (parsed.data && parsed.data.images && parsed.data.images.length > 0) {
+        const imageUrl = parsed.data.images[0].url;
         setImage(imageUrl);
         addToHistory(imageUrl, prompt, selectedModel.id);
       } else {
         console.warn('No images found in result:', result);
       }
-    } catch (err: any) {
-      console.error('Generation Error:', err);
-      setError(err.message || 'Failed to generate image');
+    } catch (err: unknown) {
+      console.error('Generation Error Full:', err);
+      // Try to extract detailed error message from fal.ai response
+      type FalError = { message?: string; body?: unknown };
+      const falError = err as FalError;
+      let errorMessage = falError.message || 'Failed to generate image';
+      if (falError.body) {
+        try {
+          // If body is a string, try to parse it, otherwise use it directly if it's an object
+          const body = typeof falError.body === 'string' ? JSON.parse(falError.body) : falError.body;
+          if (body.detail) errorMessage = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+          else if (body.message) errorMessage = body.message;
+        } catch (e) {
+          console.error('Failed to parse error body', e);
+          errorMessage = String(falError.body);
+        }
+      }
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -205,7 +282,14 @@ export default function Home() {
                         type={param.type}
                         className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-foreground backdrop-blur-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:bg-white/10"
                         value={inputValues[param.name] || ''}
-                        onChange={(e) => handleInputChange(param.name, e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const parsed =
+                            param.type === 'number'
+                              ? (value === '' ? '' : Number(value))
+                              : value;
+                          handleInputChange(param.name, parsed);
+                        }}
                       />
                     </div>
                   )}
@@ -262,17 +346,54 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
           {loading ? (
-            <div className="flex flex-col items-center gap-4 z-10">
+            <div className="flex flex-col items-center gap-4 z-10 max-w-md w-full px-4 text-center">
               <div className="relative">
                 <div className="absolute inset-0 rounded-full blur-xl bg-primary/20 animate-pulse" />
                 <div className="relative border-primary h-16 w-16 animate-spin rounded-full border-4 border-t-transparent shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
               </div>
-              <p className="text-muted-foreground animate-pulse font-medium">
-                Creating your masterpiece...
-              </p>
+              <div className="space-y-1">
+                <p className="text-lg font-medium text-foreground animate-pulse">
+                  Creating your masterpiece...
+                </p>
+                <p className="text-sm text-muted-foreground font-mono">
+                  {elapsedTime.toFixed(1)}s
+                </p>
+              </div>
+
+              {/* Logs Display */}
+              {logs.length > 0 && (
+                <div className="mt-4 w-full rounded-md bg-black/40 p-3 text-left text-xs font-mono text-muted-foreground backdrop-blur-sm border border-white/5">
+                  <div className="flex flex-col gap-1">
+                    {logs.slice(-3).map((log, i) => (
+                      <span key={i} className="line-clamp-1 opacity-80">
+                        &gt; {log}
+                      </span>
+                    ))}
+                    <span className="animate-pulse">_</span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : image ? (
             <div className="relative w-full h-full min-h-[500px] flex items-center justify-center p-4">
+              <div className="absolute right-4 top-4 flex gap-2 z-20">
+                <button
+                  type="button"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white border border-white/15 shadow-sm transition hover:bg-black/80"
+                  onClick={() => openPreview(image)}
+                  aria-label="Открыть превью"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black border border-white/30 shadow-sm transition hover:bg-white/90"
+                  aria-label="Скачать изображение"
+                  onClick={() => handleDownload(image)}
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              </div>
               <img
                 src={image}
                 alt={inputValues['prompt']}
@@ -288,12 +409,24 @@ export default function Home() {
             </div>
           )}
           {error && (
-            <div className="bg-destructive/10 text-destructive absolute bottom-4 rounded-md px-4 py-2 border border-destructive/20 backdrop-blur-md">
+            <div className="bg-destructive/10 text-destructive absolute bottom-4 rounded-md px-4 py-2 border border-destructive/20 backdrop-blur-md max-w-[90%] text-center">
               {error}
             </div>
           )}
         </div>
       </div>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl bg-black/90 border border-white/10">
+          {previewSrc && (
+            <img
+              src={previewSrc}
+              alt="Preview"
+              className="w-full h-full max-h-[80vh] object-contain rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
