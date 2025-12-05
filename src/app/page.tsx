@@ -6,6 +6,8 @@ import { Wand2, Loader2 } from 'lucide-react';
 import { AI_MODELS, ModelConfig } from '@/lib/models';
 import { ModelSelector } from '@/components/model-selector';
 import { PromptInput } from '@/components/prompt-input';
+import { ImageUpload } from '@/components/image-upload';
+import { HistorySheet, HistoryItem } from '@/components/history-sheet';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -30,6 +32,40 @@ export default function Home() {
   const [image, setImage] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [history, setHistory] = React.useState<HistoryItem[]>([]);
+
+  // Load history from localStorage
+  React.useEffect(() => {
+    const saved = localStorage.getItem('visia_history');
+    if (saved) {
+      try {
+        setHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse history', e);
+      }
+    }
+  }, []);
+
+  // Save history to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('visia_history', JSON.stringify(history));
+  }, [history]);
+
+  const addToHistory = (url: string, prompt: string, modelId: string) => {
+    const newItem: HistoryItem = {
+      id: Date.now().toString(),
+      url,
+      prompt,
+      modelId,
+      timestamp: Date.now(),
+    };
+    setHistory((prev) => [newItem, ...prev]);
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem('visia_history');
+  };
 
   // Initialize default values when model changes
   React.useEffect(() => {
@@ -70,9 +106,13 @@ export default function Home() {
       console.log('Fal.ai Result:', result);
 
       if (result.images && result.images.length > 0) {
-        setImage(result.images[0].url);
+        const imageUrl = result.images[0].url;
+        setImage(imageUrl);
+        addToHistory(imageUrl, prompt, selectedModel.id);
       } else if (result.data && result.data.images && result.data.images.length > 0) {
-        setImage(result.data.images[0].url);
+        const imageUrl = result.data.images[0].url;
+        setImage(imageUrl);
+        addToHistory(imageUrl, prompt, selectedModel.id);
       } else {
         console.warn('No images found in result:', result);
       }
@@ -96,6 +136,7 @@ export default function Home() {
             <span className="text-xl font-bold tracking-tight">VISIA</span>
           </div>
           <div className="flex items-center gap-4">
+            <HistorySheet history={history} onClear={clearHistory} />
             <div className="rounded-full bg-secondary px-3 py-1 text-sm font-medium text-secondary-foreground border border-border">
               💎 100 Tokens
             </div>
@@ -135,7 +176,13 @@ export default function Home() {
                   <label className="text-sm font-medium leading-none text-muted-foreground">
                     {param.label}
                   </label>
-                  {param.type === 'select' ? (
+                  {param.name === 'image_url' || param.name === 'image_urls' ? (
+                    <ImageUpload
+                      value={inputValues[param.name]}
+                      onChange={(url) => handleInputChange(param.name, url)}
+                      multiple={param.multiple}
+                    />
+                  ) : param.type === 'select' ? (
                     <Select
                       value={inputValues[param.name] || param.default || ''}
                       onValueChange={(val) => handleInputChange(param.name, val)}
