@@ -45,7 +45,7 @@ export const AI_MODELS: ModelConfig[] = [
         default: '1:1',
       },
       { name: 'num_images', type: 'number', label: 'Number of Images', default: 1 },
-      { name: 'image_url', type: 'text', label: 'Reference Image (optional)' },
+      { name: 'image_urls', type: 'text', label: 'Reference Image (optional)', multiple: true },
     ],
   },
   {

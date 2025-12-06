@@ -1,27 +1,48 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { fal } from '@fal-ai/client';
-import { Wand2, Loader2, Download, ZoomIn } from 'lucide-react';
+import {
+    Wand2,
+    Loader2,
+    Download,
+    ZoomIn,
+    Plus,
+    Image as ImageIcon,
+    Settings2,
+    X,
+    ChevronDown,
+    Zap,
+    User as UserIcon,
+    LogOut,
+    LayoutDashboard
+} from 'lucide-react';
 import { AI_MODELS, ModelConfig } from '@/lib/models';
-import { ModelSelector } from '@/components/model-selector';
-import { PromptInput } from '@/components/prompt-input';
-import { ImageUpload } from '@/components/image-upload';
+// import { PromptInput } from '@/components/prompt-input'; // Integrated now
+// import { ImageUpload } from '@/components/image-upload'; // Integrated now
 import { HistorySheet, HistoryItem } from '@/components/history-sheet';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-type InputValue = string | number | string[] | File | File[] | null | undefined;
+type InputValue = string | number | boolean | string[] | File | File[] | (string | File)[] | null | undefined;
 type FalImage = { url: string };
 type FalResponse = { images?: FalImage[]; data?: { images?: FalImage[] } };
 type FalQueueUpdate = { status?: string; logs?: { message?: string | null | undefined }[] };
 
 const USD_PER_TOKEN = 0.01;
 
-// Using fal.ai via proxy to avoid leaking keys.
 fal.config({
     proxyUrl: '/api/fal/proxy',
 });
@@ -44,6 +65,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
     const [tokenBalance, setTokenBalance] = React.useState<number | null>(null);
 
     const supabase = createClient();
+    const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
     // Sync user profile and balance
     React.useEffect(() => {
@@ -64,7 +86,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         syncUser();
     }, [supabase, user.email, user.id]);
 
-    // Load history from Supabase
+    // Load history
     React.useEffect(() => {
         const fetchHistory = async () => {
             const { data, error } = await supabase
@@ -73,12 +95,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
-            if (error) {
-                console.error('Failed to load history:', error);
-                return;
-            }
-
-            if (data) {
+            if (!error && data) {
                 setHistory(data.map(item => ({
                     id: item.id,
                     url: item.image_url,
@@ -88,11 +105,10 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                 })));
             }
         };
-
         fetchHistory();
     }, [supabase, user.id]);
 
-    // Timer effect
+    // Timer
     React.useEffect(() => {
         let interval: NodeJS.Timeout;
         if (loading) {
@@ -105,54 +121,22 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         return () => clearInterval(interval);
     }, [loading]);
 
-    const addToHistory = async (url: string, prompt: string, modelId: string) => {
-        // Optimistic update
-        const newItem: HistoryItem = {
-            id: Date.now().toString(), // Temporary ID
-            url,
-            prompt,
-            modelId,
-            timestamp: Date.now(),
-        };
-        setHistory((prev) => [newItem, ...prev]);
-
-        // Save to Supabase
-        const { error } = await supabase.from('history').insert({
-            user_id: user.id,
-            image_url: url,
-            prompt,
-            model_id: modelId
-        });
-
-        if (error) {
-            console.error('Failed to save history:', error);
-        }
-    };
-
-    const clearHistory = async () => {
-        setHistory([]);
-        // Optional: Delete from DB? Or just clear local view?
-        // For safety, let's just clear local view for now or implement delete all endpoint
-        // await supabase.from('history').delete().eq('user_id', user.id);
-    };
-
-    // Initialize default values when model changes
+    // Defaults
     React.useEffect(() => {
         setInputValues((prev) => {
             const next: Record<string, InputValue> = {};
             selectedModel.inputParams?.forEach((param) => {
+                // Keep image/prompt if switching models
                 let carry: InputValue | undefined = prev[param.name];
 
+                // Helper to migrate single <-> multi image params if model changes
                 if (carry === undefined && param.name === 'image_urls' && prev['image_url'] !== undefined) {
                     const src = prev['image_url'];
                     carry = Array.isArray(src) ? src : src ? [src] : [];
                 }
-
                 if (carry === undefined && param.name === 'image_url' && prev['image_urls'] !== undefined) {
                     const src = prev['image_urls'];
-                    if (Array.isArray(src) && src.length > 0) {
-                        carry = src[0];
-                    }
+                    if (Array.isArray(src) && src.length > 0) carry = src[0];
                 }
 
                 if (carry !== undefined) {
@@ -163,6 +147,8 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                     next[param.name] = '';
                 }
             });
+            // Ensure prompt persists
+            if (prev['prompt']) next['prompt'] = prev['prompt'];
             return next;
         });
     }, [selectedModel]);
@@ -171,60 +157,71 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         setInputValues((prev) => ({ ...prev, [name]: value }));
     };
 
-    const openPreview = (url: string) => {
-        setPreviewSrc(url);
-        setPreviewOpen(true);
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files ? Array.from(e.target.files) : [];
+        if (!files.length) return;
+
+        // Determine if model supports multiple
+        const supportMulti = selectedModel.inputParams?.find(p => p.name === 'image_urls');
+        const paramName = supportMulti ? 'image_urls' : 'image_url';
+
+        if (supportMulti) {
+            const current = (inputValues['image_urls'] as any[]) || [];
+            handleInputChange('image_urls', [...current, ...files]);
+        } else {
+            handleInputChange('image_url', files[0]);
+        }
+        e.target.value = '';
     };
 
-    const handleDownload = async (url: string) => {
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = objectUrl;
-            link.download = 'image.png';
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(objectUrl);
-        } catch (e) {
-            console.error('Download failed', e);
+    const removeRefImage = (index: number) => {
+        const supportMulti = selectedModel.inputParams?.find(p => p.name === 'image_urls');
+        if (supportMulti) {
+            const current = (inputValues['image_urls'] as any[]) || [];
+            const next = [...current];
+            next.splice(index, 1);
+            handleInputChange('image_urls', next);
+        } else {
+            handleInputChange('image_url', null);
         }
+    };
+
+
+    const getReferenceImages = () => {
+        const single = inputValues['image_url'];
+        const multi = inputValues['image_urls'];
+        const refs: { file: File | string, isMulti: boolean, index: number }[] = [];
+
+        if (multi && Array.isArray(multi)) {
+            multi.forEach((f, i) => refs.push({ file: f, isMulti: true, index: i }));
+        } else if (single) {
+            refs.push({ file: single as File | string, isMulti: false, index: 0 });
+        }
+        return refs;
     };
 
     const generateImage = async () => {
         const promptValue = inputValues['prompt'];
         if (typeof promptValue !== 'string' || !promptValue.trim()) return;
         const prompt = promptValue.trim();
-        const hasRef =
-            Boolean(inputValues['image_url']) ||
-            (Array.isArray(inputValues['image_urls']) && inputValues['image_urls'].length > 0);
+        const hasRef = getReferenceImages().length > 0;
         const modelIdToUse = selectedModel.editId && hasRef ? selectedModel.editId : selectedModel.id;
 
         const uploadReferences = async () => {
             const uploads: Record<string, string | string[] | undefined> = {};
-
             const single = inputValues['image_url'];
-            if (single instanceof File) {
-                uploads.image_url = await fal.storage.upload(single);
-            } else if (typeof single === 'string' && single) {
-                uploads.image_url = single;
-            }
+            if (single instanceof File) uploads.image_url = await fal.storage.upload(single);
+            else if (typeof single === 'string' && single) uploads.image_url = single;
 
             const multi = inputValues['image_urls'];
             if (Array.isArray(multi)) {
                 const urls: string[] = [];
                 for (const item of multi) {
-                    if (item instanceof File) {
-                        urls.push(await fal.storage.upload(item));
-                    } else if (typeof item === 'string' && item) {
-                        urls.push(item);
-                    }
+                    if (item instanceof File) urls.push(await fal.storage.upload(item));
+                    else if (typeof item === 'string' && item) urls.push(item);
                 }
                 if (urls.length) uploads.image_urls = urls;
             }
-
             return uploads;
         };
 
@@ -233,17 +230,11 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         setImage(null);
         setLogs([]);
 
-        console.log('Generating with inputs:', {
-            model: selectedModel.id,
-            inputs: inputValues
-        });
-
         try {
             const uploadedRefs = await uploadReferences();
-            const inputPayload: Record<string, InputValue> = {
-                ...inputValues,
-                ...uploadedRefs,
-            };
+            const inputPayload: Record<string, InputValue> = { ...inputValues, ...uploadedRefs };
+
+            // Clean up payload based on mode
             if (modelIdToUse.includes('/edit')) {
                 delete inputPayload.num_images;
                 delete inputPayload.resolution;
@@ -253,299 +244,323 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
             }
 
             const result = await fal.subscribe(modelIdToUse, {
-                input: {
-                    ...inputPayload,
-                },
+                input: inputPayload,
                 logs: true,
                 onQueueUpdate: (update: FalQueueUpdate) => {
-                    if (update.status === 'IN_PROGRESS') {
-                        if (update.logs && update.logs.length) {
-                            const messages = update.logs
-                                .map((l) => l.message)
-                                .filter((msg): msg is string => Boolean(msg));
-                            if (messages.length) {
-                                setLogs((prev) => [
-                                    ...prev,
-                                    ...messages
-                                ]);
-                            }
-                        }
+                    if (update.status === 'IN_PROGRESS' && update.logs?.length) {
+                        const msgs = update.logs.map(l => l.message).filter(Boolean) as string[];
+                        setLogs(p => [...p, ...msgs]);
                     }
                 },
             });
 
-            console.log('Fal.ai Result:', result);
-
             const parsed = result as FalResponse;
+            let imageUrl: string | undefined;
 
-            if (parsed.images && parsed.images.length > 0) {
-                const imageUrl = parsed.images[0].url;
+            if (parsed.images?.length) imageUrl = parsed.images[0].url;
+            else if (parsed.data?.images?.length) imageUrl = parsed.data.images[0].url;
+
+            if (imageUrl) {
                 setImage(imageUrl);
-                addToHistory(imageUrl, prompt, modelIdToUse);
-            } else if (parsed.data && parsed.data.images && parsed.data.images.length > 0) {
-                const imageUrl = parsed.data.images[0].url;
-                setImage(imageUrl);
-                addToHistory(imageUrl, prompt, modelIdToUse);
-            } else {
-                console.warn('No images found in result:', result);
+                // Optimistic History
+                const newItem: HistoryItem = {
+                    id: Date.now().toString(),
+                    url: imageUrl,
+                    prompt,
+                    modelId: modelIdToUse,
+                    timestamp: Date.now(),
+                };
+                setHistory(prev => [newItem, ...prev]);
+                await supabase.from('history').insert({
+                    user_id: user.id,
+                    image_url: imageUrl,
+                    prompt,
+                    model_id: modelIdToUse
+                });
             }
-        } catch (err: unknown) {
-            console.error('Generation Error Full:', err);
-            type FalError = { message?: string; body?: unknown };
-            const falError = err as FalError;
-            let errorMessage = falError.message || 'Failed to generate image';
-            if (falError.body) {
-                try {
-                    const body = typeof falError.body === 'string' ? JSON.parse(falError.body) : falError.body;
-                    if (body.detail) errorMessage = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
-                    else if (body.message) errorMessage = body.message;
-                } catch (e) {
-                    console.error('Failed to parse error body', e);
-                    errorMessage = String(falError.body);
-                }
-            }
-            setError(errorMessage);
+        } catch (err: any) {
+            const msg = err?.body?.detail || err?.message || 'Generation failed';
+            setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
         } finally {
             setLoading(false);
         }
     };
+
     const handleLogout = async () => {
         await supabase.auth.signOut();
         window.location.href = '/login';
     };
 
     const getPrice = () => {
-        if (!selectedModel.basePriceUsd || USD_PER_TOKEN <= 0) return null;
-        return Number(((selectedModel.basePriceUsd * 1.2) / USD_PER_TOKEN).toFixed(2));
+        if (!selectedModel.basePriceUsd) return null;
+        return ((selectedModel.basePriceUsd * 1.2) / USD_PER_TOKEN).toFixed(2);
+    };
+
+    const previewRef = (file: File | string) => {
+        if (typeof file === 'string') return file;
+        return URL.createObjectURL(file);
     };
 
     return (
-        <main className="flex min-h-screen flex-col items-center bg-background text-foreground">
+        <main className="flex min-h-screen flex-col items-center bg-[#000000] text-foreground selection:bg-primary/30">
             {/* Header */}
-            <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-background/60 px-6 py-4 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-                <div className="mx-auto flex max-w-6xl items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-                            <Wand2 className="h-5 w-5" />
+            <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/80 px-6 py-4 backdrop-blur-xl">
+                <div className="mx-auto flex max-w-[1400px] items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-primary to-orange-600 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+                            <Zap className="h-5 w-5 text-white" fill="currentColor" />
                         </div>
-                        <span className="text-xl font-bold tracking-tight">VISIA</span>
+                        <div>
+                            <span className="block text-lg font-bold tracking-tight text-white leading-none">VISIA</span>
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Intelligence Studio</span>
+                        </div>
                     </div>
-                        <div className="flex items-center gap-4">
-                            <HistorySheet history={history} onClear={clearHistory} />
-                            <div className="rounded-full bg-secondary px-3 py-1 text-sm font-medium text-secondary-foreground border border-border">
-                                {tokenBalance ?? '...'} Tokens
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
-                                Log Out
-                            </Button>
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-purple-600 border border-border" />
+                    <div className="flex items-center gap-4">
+                        <HistorySheet history={history} onClear={() => setHistory([])} />
+                        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 transition-colors hover:border-white/20">
+                            <Zap className="h-3 w-3 text-primary" fill="currentColor" />
+                            <span className="text-sm font-medium text-white">{tokenBalance ?? '...'}</span>
+                        </div>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 bg-white/5 border border-white/10 hover:bg-white/10 text-zinc-400 hover:text-white">
+                                    <UserIcon className="h-4 w-4" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-56 p-2 bg-[#0A0A0A] border-white/10 text-white">
+                                <div className="px-2 py-1.5 text-sm text-zinc-400 border-b border-white/5 mb-1 truncate">
+                                    {user.email}
+                                </div>
+                                <Link
+                                    href="/account"
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-white hover:bg-white/10 transition-colors mb-1"
+                                >
+                                    <UserIcon className="h-4 w-4 text-zinc-400" />
+                                    Profile
+                                </Link>
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                                >
+                                    <LogOut className="h-4 w-4" />
+                                    Logout
+                                </button>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
             </header>
 
-            {/* Main Content */}
-            <div className="container mx-auto flex max-w-5xl flex-col gap-8 px-4 py-12">
-                {/* Controls */}
-                <div className="flex flex-col gap-6">
-                    <div className="flex flex-col gap-2">
-                        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                            Create with AI
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Select a model and describe your vision.
-                        </p>
-                    </div>
+            <div className="flex-1 w-full max-w-[1400px] gap-8 p-6 flex flex-col items-center">
 
-                    <div className="flex flex-col gap-8 md:flex-row md:items-start">
-                        <div className="w-full md:w-1/3 space-y-6">
-                            <div className="space-y-4">
-                                <label className="text-sm font-medium leading-none text-muted-foreground">
-                                    Model
-                                </label>
-                                <ModelSelector
-                                    selectedModel={selectedModel}
-                                    onSelect={setSelectedModel}
-                                />
-                            </div>
-
-                            {/* Dynamic Inputs (excluding prompt) */}
-                            {selectedModel.inputParams?.filter(p => p.name !== 'prompt').map((param) => (
-                                <div key={param.name} className="space-y-2">
-                                    <label className="text-sm font-medium leading-none text-muted-foreground">
-                                        {param.label}
-                                    </label>
-                                    {param.name === 'image_url' || param.name === 'image_urls' ? (
-                                        <ImageUpload
-                                            value={inputValues[param.name]}
-                                            onChange={(url) => handleInputChange(param.name, url)}
-                                            multiple={param.multiple}
-                                        />
-                                    ) : param.type === 'select' ? (
-                                        <Select
-                                            value={inputValues[param.name] || param.default || ''}
-                                            onValueChange={(val) => handleInputChange(param.name, val)}
-                                        >
-                                            <SelectTrigger className="border-white/10 bg-white/5 backdrop-blur-sm transition-colors hover:bg-white/10 focus:ring-primary/50">
-                                                <SelectValue placeholder={`Select ${param.label}`} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {param.options?.map((opt) => (
-                                                    <SelectItem key={opt} value={opt}>
-                                                        {opt}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    ) : (
-                                        <div className="relative">
-                                            <input
-                                                type={param.type}
-                                                className="flex h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-foreground backdrop-blur-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors hover:bg-white/10"
-                                                value={inputValues[param.name] || ''}
-                                                onChange={(e) => {
-                                                    const value = e.target.value;
-                                                    const parsed = param.type === 'number'
-                                                        ? (value === '' ? '' : Number(value))
-                                                        : value;
-                                                    handleInputChange(param.name, parsed);
-                                                }}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-
-                            <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur-md transition-all hover:bg-white/10">
-                                <p className="text-foreground font-medium">
-                                    {selectedModel.name}
-                                </p>
-                                <p className="mt-2 text-sm text-muted-foreground">{selectedModel.description}</p>
-                            </div>
-                        </div>
-
-                        <div className="w-full md:w-2/3 space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium leading-none text-muted-foreground">
-                                    Prompt
-                                </label>
-                                <PromptInput
-                                    value={inputValues['prompt'] || ''}
-                                    onChange={(val) => handleInputChange('prompt', val)}
-                                    onSubmit={generateImage}
-                                    loading={loading}
-                                />
-                            </div>
-
-                            <Button
-                                onClick={generateImage}
-                                disabled={loading || !inputValues['prompt']}
-                                className="group relative h-14 w-full overflow-hidden rounded-xl bg-gradient-to-r from-red-600 to-orange-600 text-lg font-bold text-white shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(220,38,38,0.7)] disabled:opacity-50"
-                            >
-                                <div className="absolute inset-0 bg-white/20 opacity-0 transition-opacity group-hover:opacity-100" />
-                                <div className="relative flex items-center justify-center gap-2">
-                                    {loading ? (
-                                        <>
-                                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                            Generating...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Wand2 className="mr-2 h-5 w-5" />
-                                            Generate Image
-                                        </>
-                                    )}
-                                </div>
-                            </Button>
-                                {getPrice() !== null && (
-                                    <p className="text-xs text-muted-foreground text-right">
-                                        Estimate: {getPrice()} tokens
-                                    </p>
-                                )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Output Area */}
-                <div className="mt-8 flex min-h-[500px] w-full items-center justify-center rounded-xl border border-border bg-card/30 backdrop-blur-sm relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
+                {/* Result Area (Dynamic Height) */}
+                <div className="w-full max-w-4xl flex-1 flex flex-col items-center justify-center min-h-[400px]">
                     {loading ? (
-                        <div className="flex flex-col items-center gap-4 z-10 max-w-md w-full px-4 text-center">
+                        <div className="relative flex flex-col items-center justify-center gap-6 p-12 transition-all">
                             <div className="relative">
-                                <div className="absolute inset-0 rounded-full blur-xl bg-primary/20 animate-pulse" />
-                                <div className="relative border-primary h-16 w-16 animate-spin rounded-full border-4 border-t-transparent shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
+                                <div className="absolute inset-0 rounded-full blur-2xl bg-primary/20 animate-pulse" />
+                                <div className="relative h-20 w-20 rounded-full border-[3px] border-white/10 border-t-primary animate-spin" />
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <SparklesIcon className="w-8 h-8 text-primary animate-pulse" />
+                                </div>
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-lg font-medium text-foreground animate-pulse">
-                                    Creating your masterpiece...
-                                </p>
-                                <p className="text-sm text-muted-foreground font-mono">
-                                    {elapsedTime.toFixed(1)}s
-                                </p>
+                            <div className="text-center space-y-2">
+                                <p className="text-xl font-medium text-white animate-pulse">Dreaming...</p>
+                                <p className="text-sm text-zinc-500 font-mono">{elapsedTime.toFixed(1)}s</p>
                             </div>
-
                             {logs.length > 0 && (
-                                <div className="mt-4 w-full rounded-md bg-black/40 p-3 text-left text-xs font-mono text-muted-foreground backdrop-blur-sm border border-white/5">
-                                    <div className="flex flex-col gap-1">
-                                        {logs.slice(-3).map((log, i) => (
-                                            <span key={i} className="line-clamp-1 opacity-80">
-                                                &gt; {log}
-                                            </span>
-                                        ))}
-                                        <span className="animate-pulse">_</span>
-                                    </div>
+                                <div className="max-w-xs w-full text-center overflow-hidden">
+                                    <p className="text-xs text-zinc-600 truncate animate-pulse">
+                                        {logs[logs.length - 1]}
+                                    </p>
                                 </div>
                             )}
                         </div>
                     ) : image ? (
-                        <div className="relative w-full h-full min-h-[500px] flex items-center justify-center p-4">
-                            <div className="absolute right-4 top-4 flex gap-2 z-20">
-                                <button
-                                    type="button"
-                                    className="flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white border border-white/15 shadow-sm transition hover:bg-black/80"
-                                    onClick={() => openPreview(image)}
-                                    aria-label="Open preview"
-                                >
-                                    <ZoomIn className="h-4 w-4" />
-                                </button>
-                                <button
-                                    type="button"
-                                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black border border-white/30 shadow-sm transition hover:bg-white/90"
-                                    aria-label="Download image"
-                                    onClick={() => handleDownload(image)}
-                                >
-                                    <Download className="h-4 w-4" />
-                                </button>
-                            </div>
+                        <div className="relative group w-full h-full flex items-center justify-center">
                             <img
                                 src={image}
-                                alt={inputValues['prompt']}
-                                className="max-h-[700px] w-auto object-contain rounded-lg shadow-2xl"
+                                alt="Generated"
+                                className="max-h-[60vh] max-w-full rounded-2xl shadow-2xl border border-white/5 cursor-zoom-in"
+                                onClick={() => { setPreviewSrc(image); setPreviewOpen(true); }}
                             />
+                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                <Button size="icon" variant="secondary" className="rounded-full h-10 w-10 bg-black/50 backdrop-blur border border-white/10 hover:bg-black/70 text-white" onClick={() => {
+                                    const link = document.createElement('a');
+                                    link.href = image;
+                                    link.download = `visia-${Date.now()}.png`;
+                                    link.click();
+                                }}>
+                                    <Download className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     ) : (
-                        <div className="text-muted-foreground flex flex-col items-center gap-4 z-10">
-                            <div className="rounded-full bg-secondary/50 p-6 border border-border shadow-inner">
-                                <Wand2 className="h-8 w-8 opacity-50" />
+                        <div className="flex flex-col items-center justify-center gap-4 text-zinc-700 opacity-50 select-none">
+                            <div className="w-24 h-24 rounded-[2rem] border-2 border-dashed border-current flex items-center justify-center">
+                                <ImageIcon className="w-10 h-10" />
                             </div>
-                            <p className="text-lg">Your creation will appear here</p>
+                            <p className="font-medium tracking-tight">Ready to create</p>
                         </div>
                     )}
                     {error && (
-                        <div className="bg-destructive/10 text-destructive absolute bottom-4 rounded-md px-4 py-2 border border-destructive/20 backdrop-blur-md max-w-[90%] text-center">
+                        <div className="mt-6 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-medium">
                             {error}
                         </div>
                     )}
                 </div>
+
+                {/* THE COMMAND CENTER */}
+                <div className="w-full max-w-4xl mt-auto pb-6 z-10">
+                    <div className="rounded-2xl border border-white/10 bg-[#0a0a0a]/90 backdrop-blur-xl shadow-2xl">
+
+                        {/* Row 1: Asset Slots */}
+                        {getReferenceImages().length > 0 || true ? (
+                            <div className="px-5 pt-5 flex items-center gap-3">
+                                {/* Upload Trigger */}
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="flex-shrink-0 group cursor-pointer w-14 h-14 rounded-xl border border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30 transition-all flex flex-col items-center justify-center gap-0.5"
+                                >
+                                    <Plus className="h-5 w-5 text-zinc-500 group-hover:text-white transition-colors" />
+                                    <span className="text-[9px] font-medium text-zinc-600 group-hover:text-zinc-400">Image</span>
+                                    <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} accept="image/*" />
+                                </div>
+
+                                {/* Active Assets */}
+                                {getReferenceImages().map((ref, i) => (
+                                    <div key={i} className="relative flex-shrink-0 w-14 h-14 rounded-xl border border-white/10 overflow-hidden group">
+                                        <img src={previewRef(ref.file)} className="w-full h-full object-cover" alt="ref" />
+                                        <div
+                                            onClick={(e) => { e.stopPropagation(); removeRefImage(ref.index); }}
+                                            className="absolute inset-0 bg-black/60 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <X className="h-4 w-4 text-white" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {/* Row 2: Prompt Input */}
+                        <div className="px-5 py-4">
+                            <input
+                                className="w-full bg-transparent border-none text-base font-medium placeholder:text-zinc-600 text-white focus:outline-none focus:ring-0"
+                                placeholder="Describe your imagination..."
+                                value={inputValues['prompt'] as string || ''}
+                                onChange={(e) => handleInputChange('prompt', e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        generateImage();
+                                    }
+                                }}
+                                autoComplete="off"
+                            />
+                        </div>
+
+                        {/* Row 3: Controls + Generate (single row) */}
+                        <div className="px-5 pb-5 flex items-center justify-between gap-4">
+                            {/* Left: Settings Pills */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {/* Model Pill */}
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium text-white transition-colors">
+                                            <SparklesIcon className="w-4 h-4 text-primary" />
+                                            {selectedModel.name}
+                                            <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="start" className="w-[280px] p-2 bg-[#0A0A0A] border-white/10">
+                                        {AI_MODELS.map(model => (
+                                            <div
+                                                key={model.id}
+                                                onClick={() => setSelectedModel(model)}
+                                                className={cn(
+                                                    "flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors",
+                                                    selectedModel.id === model.id ? "bg-white/10" : "hover:bg-white/5"
+                                                )}
+                                            >
+                                                <div className="h-8 w-8 rounded-lg bg-white/5 flex items-center justify-center text-sm">
+                                                    {model.id.includes('nano') ? '⚡' : '🎨'}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium text-white">{model.name}</div>
+                                                    <div className="text-[11px] text-zinc-500 truncate">{model.description}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </PopoverContent>
+                                </Popover>
+
+                                {/* Other Settings Pills */}
+                                {selectedModel.inputParams?.filter(p => !['prompt', 'image_url', 'image_urls'].includes(p.name)).map(param => (
+                                    <Popover key={param.name}>
+                                        <PopoverTrigger asChild>
+                                            <button className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-sm font-medium transition-colors">
+                                                <span className="text-zinc-500">{param.label}:</span>
+                                                <span className="text-white">{String(inputValues[param.name] ?? param.default ?? '')}</span>
+                                                <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+                                            </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[180px] bg-[#0A0A0A] border-white/10 p-2">
+                                            {param.type === 'select' ? (
+                                                <div className="space-y-1">
+                                                    {param.options?.map(opt => (
+                                                        <div
+                                                            key={opt}
+                                                            onClick={() => handleInputChange(param.name, opt)}
+                                                            className={cn(
+                                                                "px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors",
+                                                                inputValues[param.name] === opt
+                                                                    ? "bg-primary/20 text-primary"
+                                                                    : "text-white hover:bg-white/10"
+                                                            )}
+                                                        >
+                                                            {opt}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <input
+                                                    type={param.type}
+                                                    className="w-full bg-black border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                                                    value={String(inputValues[param.name] ?? '')}
+                                                    onChange={e => handleInputChange(param.name, param.type === 'number' ? Number(e.target.value) : e.target.value)}
+                                                />
+                                            )}
+                                        </PopoverContent>
+                                    </Popover>
+                                ))}
+                            </div>
+
+                            {/* Right: Generate Button */}
+                            <Button
+                                onClick={generateImage}
+                                disabled={loading || !inputValues['prompt']}
+                                className="h-10 px-8 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-40 disabled:shadow-none"
+                            >
+                                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Generate'}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Cost estimate */}
+                    <p className="mt-3 text-center text-xs text-zinc-600">
+                        Cost estimate: ~{getPrice()} tokens
+                    </p>
+                </div>
+
             </div>
 
             <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-                <DialogContent className="max-w-4xl bg-black/90 border border-white/10">
+                <DialogContent className="max-w-[90vw] h-[90vh] bg-black/95 border-white/10 flex items-center justify-center p-0 overflow-hidden">
                     {previewSrc && (
                         <img
                             src={previewSrc}
                             alt="Preview"
-                            className="w-full h-full max-h-[80vh] object-contain rounded-lg"
+                            className="w-full h-full object-contain"
                         />
                     )}
                 </DialogContent>
@@ -554,3 +569,10 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
     );
 }
 
+function SparklesIcon({ className }: { className?: string }) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+            <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.656-1.658L13.25 18.5l1.183-.394a2.25 2.25 0 001.658-1.656l.394-1.183.394 1.183a2.25 2.25 0 001.656 1.656l1.183.394-1.183.394a2.25 2.25 0 00-1.656 1.658z" />
+        </svg>
+    )
+}
