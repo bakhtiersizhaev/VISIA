@@ -4,39 +4,26 @@ import * as React from 'react';
 import Link from 'next/link';
 import { fal } from '@fal-ai/client';
 import {
-    Wand2,
     Loader2,
     Download,
-    ZoomIn,
     Plus,
     Image as ImageIcon,
-    Settings2,
     X,
     ChevronDown,
     Zap,
     User as UserIcon,
-    LogOut,
-    LayoutDashboard
+    LogOut
 } from 'lucide-react';
 import { AI_MODELS, ModelConfig } from '@/lib/models';
-// import { PromptInput } from '@/components/prompt-input'; // Integrated now
-// import { ImageUpload } from '@/components/image-upload'; // Integrated now
 import { HistorySheet, HistoryItem } from '@/components/history-sheet';
 import { Button } from '@/components/ui/button';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from '@/components/ui/select';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
-type InputValue = string | number | boolean | string[] | File | File[] | (string | File)[] | null | undefined;
+type InputValue = string | number | boolean | string[] | number[] | boolean[] | File | File[] | (string | File | number | boolean)[] | null | undefined;
 type FalImage = { url: string };
 type FalResponse = { images?: FalImage[]; data?: { images?: FalImage[] } };
 type FalQueueUpdate = { status?: string; logs?: { message?: string | null | undefined }[] };
