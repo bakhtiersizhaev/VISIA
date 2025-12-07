@@ -22,10 +22,11 @@ export const AI_MODELS: ModelConfig[] = [
     editId: 'fal-ai/nano-banana/edit',
     name: 'Nano Banana',
     type: 'text-to-image',
-    description: 'Fast and cost-effective generation. Edit version will be used when you add a reference image.',
+    description:
+      'Fast and cost-effective generation. Edit version will be used when you add a reference image.',
     basePriceUsd: 0.004,
     inputParams: [
-      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
+      {name: 'prompt', type: 'text', label: 'Prompt', required: true},
       {
         name: 'aspect_ratio',
         type: 'select',
@@ -40,12 +41,22 @@ export const AI_MODELS: ModelConfig[] = [
           '2:3',
           '5:4',
           '4:5',
-          '21:9'
+          '21:9',
         ],
         default: '1:1',
       },
-      { name: 'num_images', type: 'number', label: 'Number of Images', default: 1 },
-      { name: 'image_urls', type: 'text', label: 'Reference Image (optional)', multiple: true },
+      {
+        name: 'num_images',
+        type: 'number',
+        label: 'Number of Images',
+        default: 1,
+      },
+      {
+        name: 'image_urls',
+        type: 'text',
+        label: 'Reference Image (optional)',
+        multiple: true,
+      },
     ],
   },
   {
@@ -53,10 +64,11 @@ export const AI_MODELS: ModelConfig[] = [
     editId: 'fal-ai/nano-banana-pro/edit',
     name: 'Nano Banana Pro',
     type: 'text-to-image',
-    description: 'High-quality generation with resolution control. Edit version will be used when reference images are provided.',
+    description:
+      'High-quality generation with resolution control. Edit version will be used when reference images are provided.',
     basePriceUsd: 0.008,
     inputParams: [
-      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
+      {name: 'prompt', type: 'text', label: 'Prompt', required: true},
       {
         name: 'aspect_ratio',
         type: 'select',
@@ -71,7 +83,7 @@ export const AI_MODELS: ModelConfig[] = [
           '2:3',
           '5:4',
           '4:5',
-          '21:9'
+          '21:9',
         ],
         default: '1:1',
       },
@@ -82,12 +94,17 @@ export const AI_MODELS: ModelConfig[] = [
         options: ['1K', '2K', '4K'],
         default: '1K',
       },
-      { name: 'num_images', type: 'number', label: 'Number of Images', default: 1 },
+      {
+        name: 'num_images',
+        type: 'number',
+        label: 'Number of Images',
+        default: 1,
+      },
       {
         name: 'image_urls',
         type: 'text',
         label: 'Reference Images (optional)',
-        multiple: true
+        multiple: true,
       },
     ],
   },
@@ -96,10 +113,11 @@ export const AI_MODELS: ModelConfig[] = [
     editId: 'fal-ai/bytedance/seedream/v4.5/edit',
     name: 'Seedream 4.5',
     type: 'text-to-image',
-    description: "ByteDance's generation model. Edit version will be used when reference images are provided.",
+    description:
+      "ByteDance's generation model. Edit version will be used when reference images are provided.",
     basePriceUsd: 0.012,
     inputParams: [
-      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
+      {name: 'prompt', type: 'text', label: 'Prompt', required: true},
       {
         name: 'image_size', // Correct: Seedream uses image_size enum
         type: 'select',
@@ -112,7 +130,7 @@ export const AI_MODELS: ModelConfig[] = [
           'landscape_4_3',
           'landscape_16_9',
           'auto_2K',
-          'auto_4K'
+          'auto_4K',
         ],
         default: 'square_hd',
       },
@@ -120,7 +138,7 @@ export const AI_MODELS: ModelConfig[] = [
         name: 'image_urls',
         type: 'text',
         label: 'Reference Images (optional)',
-        multiple: true
+        multiple: true,
       },
     ],
   },
@@ -131,7 +149,7 @@ export const AI_MODELS: ModelConfig[] = [
     description: 'High-fidelity visuals.',
     basePriceUsd: 0.01,
     inputParams: [
-      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
+      {name: 'prompt', type: 'text', label: 'Prompt', required: true},
       {
         name: 'aspect_ratio', // Correct: ImagineArt uses aspect_ratio
         type: 'select',
@@ -145,7 +163,7 @@ export const AI_MODELS: ModelConfig[] = [
           '3:1',
           '1:3',
           '3:2',
-          '2:3'
+          '2:3',
         ],
         default: '1:1',
       },

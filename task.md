@@ -18,20 +18,20 @@
 
 ## Phase 3: Core UI (Vibecoding)
 
-- [ ] **Layout & Navigation** <!-- id: 11 -->
-  - [ ] Create responsive App Shell (Sidebar for desktop, Bottom nav/Hamburger for mobile). <!-- id: 12 -->
-  - [ ] Implement "Token Balance" display. <!-- id: 13 -->
-- [ ] **Generation Interface** <!-- id: 14 -->
-  - [x] Create `ModelSelector` component (Visual cards for models). <!-- id: 15 -->
-  - [x] Create `PromptInput` component (Textarea with auto-resize). <!-- id: 16 -->
-  - [x] Create `ImageUploader` component (Drag & drop, preview). <!-- id: 17 -->
-  - [x] Create `SettingsPanel` (Aspect ratio, count). <!-- id: 18 -->
+- [x] **Layout & Navigation** <!-- id: 11 -->
+  - [x] Create responsive App Shell (Sidebar for desktop, Bottom nav/Hamburger for mobile). <!-- id: 12 -->
+  - [x] Implement "Token Balance" display. <!-- id: 13 -->
+- [x] **Generation Interface** <!-- id: 14 -->
+  - [x] Create `ModelSelector` component (Refactored into Command Center). <!-- id: 15 -->
+  - [x] Create `PromptInput` component (Integrated). <!-- id: 16 -->
+  - [x] Create `ImageUploader` component (Integrated). <!-- id: 17 -->
+  - [x] Create `SettingsPanel` (Pills & Command Center). <!-- id: 18 -->
 
 ## Phase 4: AI Integration (fal.ai)
 
 - [x] **Backend Proxy** <!-- id: 19 -->
   - [x] Setup Next.js API route for fal.ai proxy (`/api/fal/proxy`). <!-- id: 20 -->
-- [ ] **Frontend Logic** <!-- id: 21 -->
+- [x] **Frontend Logic** <!-- id: 21 -->
   - [x] Implement `useGeneration` hook (handles loading, error, success). <!-- id: 22 -->
   - [x] Connect `Text-to-Image` flow (Flux/SDXL). <!-- id: 23 -->
   - [x] Connect `Image-to-Image` flow. <!-- id: 24 -->
@@ -39,6 +39,6 @@
 ## Phase 5: Polish & Launch
 
 - [ ] **Refinement** <!-- id: 25 -->
-  - [ ] Add loading skeletons and micro-animations. <!-- id: 26 -->
-  - [ ] Mobile responsiveness check. <!-- id: 27 -->
+  - [x] Add loading skeletons and micro-animations. <!-- id: 26 -->
+  - [x] Mobile responsiveness check. <!-- id: 27 -->
   - [ ] Error handling (Toasts). <!-- id: 28 -->

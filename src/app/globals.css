@@ -45,9 +45,8 @@
 
 body {
   color: hsl(var(--foreground));
-  background: radial-gradient(circle at 50% 0%,
-      hsl(155 30% 10% / 0.5),
-      transparent 70%),
+  background:
+    radial-gradient(circle at 50% 0%, hsl(155 30% 10% / 0.5), transparent 70%),
     hsl(var(--background));
   min-height: 100vh;
 }
@@ -69,16 +68,34 @@ body {
     scrollbar-width: none;
     /* Firefox */
   }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
 }
 
 /* Hide number input spinners (arrows) */
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-input[type="number"] {
+input[type='number'] {
   -moz-appearance: textfield;
   appearance: textfield;
 }

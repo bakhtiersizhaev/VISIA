@@ -1,14 +1,27 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { HistoryItem } from '@/components/history-sheet';
+import {useEffect, useMemo, useState} from 'react';
+import {createClient} from '@/lib/supabase/client';
+import {Button} from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {HistoryItem} from '@/components/history-sheet';
 import Link from 'next/link';
-import { appShell, appContainer, glassCard, subtleText, sectionSpacing } from '@/components/layout/theme';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Download, ZoomIn } from 'lucide-react';
+import {
+  appShell,
+  appContainer,
+  glassCard,
+  subtleText,
+  sectionSpacing,
+} from '@/components/layout/theme';
+import {Dialog, DialogContent} from '@/components/ui/dialog';
+import {Download, ZoomIn} from 'lucide-react';
 
 export default function AccountPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -21,7 +34,7 @@ export default function AccountPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase.auth.getUser();
+      const {data} = await supabase.auth.getUser();
       if (!data.user) {
         window.location.href = '/login';
         return;
@@ -43,7 +56,7 @@ export default function AccountPage() {
         .from('history')
         .select('*')
         .eq('user_id', data.user.id)
-        .order('created_at', { ascending: false })
+        .order('created_at', {ascending: false})
         .limit(10);
       if (!historyRes.error && historyRes.data) {
         setHistory(
@@ -52,7 +65,9 @@ export default function AccountPage() {
             url: item.image_url,
             prompt: item.prompt,
             modelId: item.model_id,
-            timestamp: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
+            timestamp: item.created_at
+              ? new Date(item.created_at).getTime()
+              : Date.now(),
           }))
         );
       }
@@ -72,12 +87,14 @@ export default function AccountPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-white">Account</h1>
-            <p className={subtleText}>Profile, balance, and recent generations.</p>
+            <p className={subtleText}>
+              Profile, balance, and recent generations.
+            </p>
           </div>
           <div className="flex gap-3">
             <Link
               href="/"
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-muted-foreground transition hover:border-white/30 hover:text-white hover:bg-white/10"
+              className="text-muted-foreground rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm transition hover:border-white/30 hover:bg-white/10 hover:text-white"
             >
               Back to app
             </Link>
@@ -94,7 +111,7 @@ export default function AccountPage() {
               <CardDescription>Your account info</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div className="text-sm text-muted-foreground">Email</div>
+              <div className="text-muted-foreground text-sm">Email</div>
               <div className="text-base font-medium">{email ?? '-'}</div>
             </CardContent>
           </Card>
@@ -105,7 +122,9 @@ export default function AccountPage() {
               <CardDescription>Current available tokens</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-3xl font-bold text-white">{balance ?? '...'}</div>
+              <div className="text-3xl font-bold text-white">
+                {balance ?? '...'}
+              </div>
               <div className="flex gap-3">
                 <Button disabled>Top up (soon)</Button>
                 <Button variant="outline" disabled>
@@ -125,19 +144,25 @@ export default function AccountPage() {
             {loading ? (
               <div className="text-muted-foreground text-sm">Loading...</div>
             ) : history.length === 0 ? (
-              <div className="text-muted-foreground text-sm">No history yet</div>
+              <div className="text-muted-foreground text-sm">
+                No history yet
+              </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {history.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-lg border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition"
+                    className="rounded-lg border border-white/10 bg-white/5 p-3 transition hover:bg-white/10"
                   >
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="text-muted-foreground flex items-center justify-between text-xs">
                       <span>{new Date(item.timestamp).toLocaleString()}</span>
-                      <span className="font-mono text-foreground/80">{item.modelId}</span>
+                      <span className="text-foreground/80 font-mono">
+                        {item.modelId}
+                      </span>
                     </div>
-                    <div className="mt-1 text-sm text-foreground">{item.prompt}</div>
+                    <div className="text-foreground mt-1 text-sm">
+                      {item.prompt}
+                    </div>
                     <div className="mt-2 flex items-center gap-3">
                       <button
                         type="button"
@@ -157,10 +182,10 @@ export default function AccountPage() {
                           <ZoomIn className="h-4 w-4 text-white" />
                         </div>
                       </button>
-                      <div className="flex flex-col text-xs text-muted-foreground">
+                      <div className="text-muted-foreground flex flex-col text-xs">
                         <button
                           type="button"
-                          className="flex items-center gap-1 text-primary hover:underline"
+                          className="text-primary flex items-center gap-1 hover:underline"
                           onClick={() => {
                             setPreviewSrc(item.url);
                             setPreviewOpen(true);
@@ -171,7 +196,7 @@ export default function AccountPage() {
                         </button>
                         <button
                           type="button"
-                          className="flex items-center gap-1 text-primary hover:underline"
+                          className="text-primary flex items-center gap-1 hover:underline"
                           onClick={async () => {
                             const response = await fetch(item.url);
                             const blob = await response.blob();
