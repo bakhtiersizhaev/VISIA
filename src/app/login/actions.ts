@@ -1,9 +1,9 @@
 'use server';
 
-import {revalidatePath} from 'next/cache';
-import {redirect} from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
-import {createClient} from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 export async function login(formData: FormData) {
   const supabase = createClient();
@@ -11,7 +11,7 @@ export async function login(formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
 
-  const {error} = await supabase.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -21,7 +21,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
-  redirect('/');
+  redirect('/generate');
 }
 
 export async function signup(formData: FormData) {
@@ -30,7 +30,7 @@ export async function signup(formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
 
-  const {error} = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signUp({
     email,
     password,
   });
@@ -40,7 +40,7 @@ export async function signup(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
-  redirect('/');
+  redirect('/generate');
 }
 
 export async function signInWithGoogle() {
@@ -48,7 +48,7 @@ export async function signInWithGoogle() {
   const baseUrl = (
     process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
   ).replace(/\/$/, '');
-  const {data, error} = await supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: `${baseUrl}/auth/callback`,

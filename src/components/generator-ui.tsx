@@ -3,6 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { fal } from '@fal-ai/client';
 import {
   Loader2,
@@ -15,6 +16,8 @@ import {
   User as UserIcon,
   LogOut,
   ZoomIn,
+  Sparkles,
+  Palette,
 } from 'lucide-react';
 import { AI_MODELS, ModelConfig } from '@/lib/models';
 import { HistorySheet, HistoryItem } from '@/components/history-sheet';
@@ -25,6 +28,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ImagePreviewDialog } from '@/components/image-preview-dialog';
+
 
 type InputValue =
   | string
@@ -179,6 +183,25 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
     const files = e.target.files ? Array.from(e.target.files) : [];
     if (!files.length) return;
 
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+    const validFiles: File[] = [];
+
+    for (const file of files) {
+      if (file.size > MAX_SIZE) {
+        // Show error immediately
+        setError(`File "${file.name}" is too large. Maximum size is 50MB.`);
+        // Also alert for visibility
+        alert(`File "${file.name}" is too large. Maximum size is 50MB.`);
+      } else {
+        validFiles.push(file);
+      }
+    }
+
+    if (validFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
     // Determine if model supports multiple
     const supportMulti = selectedModel.inputParams?.find(
       (p) => p.name === 'image_urls'
@@ -186,9 +209,9 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
 
     if (supportMulti) {
       const current = (inputValues['image_urls'] as (File | string)[]) || [];
-      handleInputChange('image_urls', [...current, ...files]);
+      handleInputChange('image_urls', [...current, ...validFiles]);
     } else {
-      handleInputChange('image_url', files[0]);
+      handleInputChange('image_url', validFiles[0]);
     }
     e.target.value = '';
   };
@@ -335,27 +358,33 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
   };
 
   return (
-    <main className="text-foreground selection:bg-primary/30 flex min-h-screen flex-col items-center bg-[#000000]">
+    <main className="animated-bg text-white selection:bg-purple-500/30 flex min-h-screen flex-col items-center">
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/80 px-6 py-4 backdrop-blur-xl">
+      <header className="glass sticky top-0 z-50 w-full px-6 py-4">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="from-primary flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr to-orange-600 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
-              <Zap className="h-5 w-5 text-white" fill="currentColor" />
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
+              <Image
+                src="/logo-header-mini.png"
+                alt="VISIA"
+                width={40}
+                height={40}
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <span className="block text-lg font-bold leading-none tracking-tight text-white">
                 VISIA
               </span>
-              <span className="text-muted-foreground text-[10px] font-medium uppercase tracking-wider">
+              <span className="text-white/40 text-[10px] font-medium uppercase tracking-wider">
                 Intelligence Studio
               </span>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-4">
             <HistorySheet history={history} onClear={() => setHistory([])} />
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 transition-colors hover:border-white/20">
-              <Zap className="text-primary h-3 w-3" fill="currentColor" />
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 backdrop-blur-sm">
+              <Zap className="text-purple-400 h-3 w-3" fill="currentColor" />
               <span className="text-sm font-medium text-white">
                 {tokenBalance ?? '...'}
               </span>
@@ -365,14 +394,14 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 rounded-full border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
+                  className="h-9 w-9 rounded-full border border-white/10 bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
                 >
                   <UserIcon className="h-4 w-4" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent
                 align="end"
-                className="w-56 border-white/10 bg-[#0A0A0A] p-2 text-white"
+                className="w-56 border-white/40 bg-[#0A0A0A] p-2 text-white"
               >
                 <div className="mb-1 truncate border-b border-white/5 px-2 py-1.5 text-sm text-zinc-400">
                   {user.email}
@@ -404,22 +433,22 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
             <div className="relative flex flex-col items-center justify-center gap-6 p-12 transition-all">
               <div className="relative">
                 <div className="bg-primary/20 absolute inset-0 animate-pulse rounded-full blur-2xl" />
-                <div className="border-t-primary relative h-20 w-20 animate-spin rounded-full border-[3px] border-white/10" />
+                <div className="border-t-primary relative h-20 w-20 animate-spin rounded-full border-[3px] border-white/40" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <SparklesIcon className="text-primary h-8 w-8 animate-pulse" />
+                  <Sparkles className="text-purple-400 h-8 w-8 animate-pulse" />
                 </div>
               </div>
               <div className="space-y-2 text-center">
-                <p className="animate-pulse text-xl font-medium text-white">
+                <p className="animate-pulse text-xl font-medium text-slate-900 leading-snug tracking-tight bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">
                   Dreaming...
                 </p>
-                <p className="font-mono text-sm text-zinc-500">
+                <p className="font-mono text-sm text-white/50">
                   {elapsedTime.toFixed(1)}s
                 </p>
               </div>
               {logs.length > 0 && (
                 <div className="w-full max-w-xs overflow-hidden text-center">
-                  <p className="animate-pulse truncate text-xs text-zinc-600">
+                  <p className="animate-pulse truncate text-xs text-white/40">
                     {logs[logs.length - 1]}
                   </p>
                 </div>
@@ -440,7 +469,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                 <Button
                   size="icon"
                   variant="secondary"
-                  className="h-10 w-10 rounded-full border border-white/10 bg-black/50 text-white backdrop-blur hover:bg-black/70"
+                  className="h-10 w-10 rounded-full border border-white/10 bg-black/60 text-white backdrop-blur hover:bg-black/80 shadow-md"
                   onClick={async (e) => {
                     e.stopPropagation();
                     try {
@@ -492,7 +521,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
             }
           }}
         >
-          <div className="rounded-2xl border border-white/10 bg-[#0a0a0a]/90 shadow-2xl backdrop-blur-xl">
+          <div className="glass-strong rounded-2xl shadow-2xl">
             {/* Row 1: Asset Slots */}
             {selectedModel.inputParams?.some(
               (p) => p.name === 'image_url' || p.name === 'image_urls'
@@ -501,10 +530,10 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                 {/* Upload Trigger */}
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="group flex h-14 w-14 flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-white/20 bg-white/5 transition-all hover:border-white/30 hover:bg-white/10"
+                  className="group flex h-14 w-14 flex-shrink-0 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-white/10 bg-white/5 transition-all hover:border-white/20 hover:bg-white/10"
                 >
-                  <Plus className="h-5 w-5 text-zinc-500 transition-colors group-hover:text-white" />
-                  <span className="text-[9px] font-medium text-zinc-600 group-hover:text-zinc-400">
+                  <Plus className="h-5 w-5 text-white/50 transition-colors group-hover:text-white" />
+                  <span className="text-[9px] font-medium text-white/40 group-hover:text-white/60">
                     Image
                   </span>
                   <input
@@ -521,7 +550,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                 {getReferenceImages().map((ref, i) => (
                   <div
                     key={i}
-                    className="group relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/10"
+                    className="group relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/40"
                   >
                     <img
                       src={previewRef(ref.file)}
@@ -557,7 +586,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
             {/* Row 2: Prompt Input */}
             <div className="px-5 py-4">
               <textarea
-                className="custom-scrollbar min-h-[40px] max-h-[240px] w-full resize-none border-none bg-transparent text-base font-medium text-white placeholder:text-zinc-600 focus:outline-none focus:ring-0"
+                className="custom-scrollbar min-h-[40px] max-h-[240px] w-full resize-none border-none bg-transparent text-base font-medium text-white placeholder:text-white/40 focus:outline-none focus:ring-0"
                 rows={1}
                 placeholder="Describe your imagination..."
                 value={(inputValues['prompt'] as string) || ''}
@@ -599,14 +628,14 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                 <Popover>
                   <PopoverTrigger asChild>
                     <button className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm font-medium text-white transition-colors hover:bg-white/10">
-                      <SparklesIcon className="text-primary h-4 w-4" />
+                      <Sparkles className="text-purple-400 h-4 w-4" />
                       {selectedModel.name}
-                      <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+                      <ChevronDown className="h-3.5 w-3.5 text-white/40" />
                     </button>
                   </PopoverTrigger>
                   <PopoverContent
                     align="start"
-                    className="w-[280px] border-white/10 bg-[#0A0A0A] p-2"
+                    className="w-[280px] border-white/10 bg-[#0a0a0a] p-2 shadow-xl"
                   >
                     {AI_MODELS.map((model) => (
                       <div
@@ -615,8 +644,8 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                         className={cn(
                           'flex cursor-pointer items-center gap-3 rounded-lg p-2.5 transition-colors',
                           selectedModel.id === model.id
-                            ? 'bg-white/10'
-                            : 'hover:bg-white/5'
+                            ? 'bg-white/10 text-white'
+                            : 'hover:bg-white/5 text-white/70'
                         )}
                       >
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-sm">
@@ -644,17 +673,17 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                   .map((param) => (
                     <Popover key={param.name}>
                       <PopoverTrigger asChild>
-                        <button className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm font-medium transition-colors hover:bg-white/10">
-                          <span className="text-zinc-500">{param.label}:</span>
+                        <button className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-sm font-medium transition-colors hover:bg-white/10 text-white">
+                          <span className="text-white/50">{param.label}:</span>
                           <span className="text-white">
                             {String(
                               inputValues[param.name] ?? param.default ?? ''
                             )}
                           </span>
-                          <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+                          <ChevronDown className="h-3.5 w-3.5 text-white/40" />
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-[180px] border-white/10 bg-[#0A0A0A] p-2">
+                      <PopoverContent className="w-[180px] border-white/10 bg-[#0a0a0a] p-2 shadow-xl">
                         {param.type === 'select' ? (
                           <div className="space-y-1">
                             {param.options?.map((opt) => (
@@ -677,7 +706,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                         ) : (
                           <input
                             type={param.type}
-                            className="w-full rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white"
+                            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:ring-2 focus:ring-purple-500"
                             value={String(inputValues[param.name] ?? '')}
                             onChange={(e) =>
                               handleInputChange(
@@ -698,7 +727,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
               <Button
                 onClick={generateImage}
                 disabled={loading || !inputValues['prompt']}
-                className="h-10 rounded-lg bg-emerald-500 px-8 font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-emerald-600 disabled:opacity-40 disabled:shadow-none"
+                className="h-10 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-8 font-semibold text-white shadow-lg shadow-purple-500/25 transition-all hover:shadow-purple-500/40 hover:scale-[1.02] disabled:opacity-40 disabled:shadow-none"
               >
                 {loading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -710,7 +739,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
           </div>
 
           {/* Cost estimate */}
-          <p className="mt-3 text-center text-xs text-zinc-600">
+          <p className="mt-3 text-center text-xs text-white/40">
             Cost estimate: ~{getPrice()} tokens
           </p>
         </div>
