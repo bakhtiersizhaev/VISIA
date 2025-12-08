@@ -1,86 +1,73 @@
-# VISIA - AI Imagination Studio
+# VISIA — AI Image Studio (Next.js + Supabase + fal.ai)
 
-![VISIA Banner](https://via.placeholder.com/1200x400?text=VISIA+AI+Studio)
+> Приложение генерирует изображения через fal.ai, держит токеновый баланс пользователей в Supabase и скрывает API‑ключи за серверными эндпоинтами Next.js.
 
-VISIA is a next-generation AI image generation platform built with **Next.js 14**, **Tailwind CSS**, and **fal.ai**. It features a premium, glassmorphic UI and supports multiple state-of-the-art AI models including Flux, SDXL, and more.
+## Основное
+- **Next.js 14 (App Router), TypeScript, Tailwind/shadcn/ui**.
+- **Supabase**: аутентификация (Google/email), таблица `users` с `token_balance` (default 100), таблица `history` для генераций.
+- **fal.ai**: работа через защищённый proxy `/api/fal/proxy` (ключ не попадает на клиент).
+- **История**: серверный `/api/history` для чтения/записи; клиент не пишет в БД напрямую.
+- **Множественные изображения**: модели, поддерживающие `num_images`, возвращают и показывают несколько картинок сеткой, сохраняются пачкой в историю.
 
-## ✨ Features
-
-- **Multi-Model Support**: Switch seamlessly between Nano Banana, Seedream, and ImagineArt models.
-- **Real-time Generation**: Lightning-fast inference via fal.ai serverless GPUs.
-- **Premium UI/UX**: Glassmorphism design, smooth animations (Framer Motion), and responsive layout.
-- **Secure Architecture**: Server-side proxy for API keys using Next.js API Routes.
-- **Type-Safe**: Built with TypeScript and strict type checking.
-
-## 🛠️ Tech Stack
-
-- **Framework**: [Next.js 14](https://nextjs.org/) (App Router)
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/) + [Shadcn/UI](https://ui.shadcn.com/)
-- **AI Inference**: [fal.ai](https://fal.ai/)
-- **State Management**: React Hooks / Zustand
-- **Icons**: Lucide React
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
-- A [fal.ai](https://fal.ai) API key
-
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/yourusername/visia.git
-   cd visia
-   ```
-
-2. **Install dependencies**
-
+## Запуск
+1) Установить зависимости  
    ```bash
    npm install
    ```
-
-3. **Set up Environment Variables**
-   Copy the example env file and add your fal.ai key:
-
-   ```bash
-   cp .env.example .env.local
-   ```
-
-   Edit `.env.local`:
-
+2) Настроить переменные (создайте `.env.local`):
    ```env
-   FAL_KEY=your_fal_ai_key_here
+   NEXT_PUBLIC_SUPABASE_URL=...        # Supabase URL
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=...   # anon key
+   NEXT_PUBLIC_SITE_URL=http://localhost:3000
+   FAL_KEY=...                         # fal.ai API key
    ```
-
-4. **Run the Development Server**
-
+3) Запустить дев-сервер  
    ```bash
    npm run dev
-   ```
+   ```  
+   Открыть http://localhost:3000.
 
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+## Структура
+- `src/app/page.tsx` — лендинг.
+- `src/app/login` — логин/Google OAuth.
+- `src/app/generate` — основная студия, `GeneratorUI`.
+- `src/app/account` — профиль, баланс, история (последние записи).
+- `src/app/api/fal/proxy` — серверный вызов fal.ai + списание токенов.
+- `src/app/api/history` — история генераций (GET/POST, принимает пачку).
+- `src/components/` — UI (история, предпросмотр, гриды).
+- `src/lib/models.ts` — список моделей и параметров (prompt, aspect ratio, num_images).
+- `src/middleware.ts` — защита `/generate`, `/api/fal/*` (401/redirect).
 
-## 📂 Project Structure
+## Поведение токенов
+- Стоимость считается на сервере по `basePriceUsd` модели и `num_images`.
+- При недостатке токенов `/api/fal/proxy` возвращает 402.
+- При ошибке fal.ai токены возвращаются.
+- Default баланса: 100 (задать в БД, см. ниже).
 
-```
-src/
-├── app/              # Next.js App Router pages and API routes
-├── components/       # React components
-│   ├── ui/           # Reusable UI components (Buttons, Inputs, etc.)
-│   └── ...           # Feature-specific components
-├── lib/              # Utilities, hooks, and constants
-└── ...
-```
+## Настройка Supabase (минимум)
+- Таблица `users`: поля `id uuid primary key`, `email text`, `token_balance integer default 100 not null`.
+- Таблица `history`: `id uuid default uuid_generate_v4()`, `user_id uuid`, `image_url text`, `prompt text`, `model_id text`, `created_at timestamptz default now()`.
+- Включить UUID ext (`uuid-ossp`), если нужно.
+- **RLS**: включить и добавить политики:
+  - `users`: select/insert/update, когда `auth.uid() = id`; запрет anon на insert/update.
+  - `history`: select/insert, когда `auth.uid() = user_id`; запрет anon.
 
-## 🤝 Contributing
+## Безопасность / TODO
+- Добавить rate-limit на `/api/fal/proxy` (per user/IP) — сейчас нет ограничителя.
+- Сделать списание токенов + вызов fal.ai атомарным через транзакционный RPC в БД (сейчас списание/возврат отдельными запросами).
+- Прокидывать cookies Supabase в ответах `/api/fal/proxy` и `/api/history` (формируются, но не возвращаются).
+- История: при росте объёма добавить пагинацию/курсор в API и ленивую подгрузку в UI.
+- Отображение стоимости: синхронизировать UI-оценку с серверной формулой (num_images, модель).
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Скрипты
+- `npm run dev` — запуск в dev.
+- `npm run build` — сборка.
+- `npm run start` — прод-сервер.
+- `npm run lint` — линт (входит в `next build`).
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Быстрый чек перед релизом
+- ✅ Логин/Google OAuth проходит, сессия живая.
+- ✅ Баланс > 0, `/api/fal/proxy` отвечает 200.
+- ✅ Генерация с `num_images>1` возвращает несколько изображений и сохраняет их в истории.
+- ✅ Ошибка fal.ai не списывает токены (виден рефанд).
+- ✅ RLS включён, anon не может писать в `users`/`history`.

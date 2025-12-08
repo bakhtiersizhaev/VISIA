@@ -9,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Palette } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -133,7 +132,7 @@ export default function LoginPage({
                   variant="ghost"
                   className="w-full text-white/50 hover:bg-white/5 hover:text-white"
                 >
-                  Don't have an account? Sign Up
+                  Don&apos;t have an account? Sign Up
                 </Button>
               </div>
             </form>

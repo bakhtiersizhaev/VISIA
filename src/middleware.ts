@@ -2,6 +2,20 @@ import {createServerClient, type CookieOptions} from '@supabase/ssr';
 import {NextResponse, type NextRequest} from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const needsAuth =
+    path.startsWith('/account') ||
+    path.startsWith('/generate') ||
+    path.startsWith('/api/fal');
+
+  if (!needsAuth) {
+    return NextResponse.next({
+      request: {
+        headers: request.headers,
+      },
+    });
+  }
+
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -58,8 +72,11 @@ export async function middleware(request: NextRequest) {
     data: {user},
   } = await supabase.auth.getUser();
 
-  // Protect account and private areas, but allow landing on /
-  if (!user && request.nextUrl.pathname.startsWith('/account')) {
+  if (!user && path.startsWith('/api/')) {
+    return NextResponse.json({error: 'Unauthorized'}, {status: 401});
+  }
+
+  if (!user) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

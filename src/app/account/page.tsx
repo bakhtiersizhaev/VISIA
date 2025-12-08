@@ -52,24 +52,10 @@ export default function AccountPage() {
       if (!balanceRes.error && balanceRes.data) {
         setBalance(balanceRes.data.token_balance);
       }
-      const historyRes = await supabase
-        .from('history')
-        .select('*')
-        .eq('user_id', data.user.id)
-        .order('created_at', {ascending: false})
-        .limit(10);
-      if (!historyRes.error && historyRes.data) {
-        setHistory(
-          historyRes.data.map((item) => ({
-            id: item.id,
-            url: item.image_url,
-            prompt: item.prompt,
-            modelId: item.model_id,
-            timestamp: item.created_at
-              ? new Date(item.created_at).getTime()
-              : Date.now(),
-          }))
-        );
+      const historyRes = await fetch('/api/history');
+      if (historyRes.ok) {
+        const json = await historyRes.json();
+        if (json.history) setHistory(json.history.slice(0, 10));
       }
       setLoading(false);
     };

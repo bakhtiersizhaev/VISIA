@@ -17,14 +17,12 @@ import {
   LogOut,
   ZoomIn,
   Sparkles,
-  Palette,
 } from 'lucide-react';
 import { AI_MODELS, ModelConfig } from '@/lib/models';
 import { HistorySheet, HistoryItem } from '@/components/history-sheet';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ImagePreviewDialog } from '@/components/image-preview-dialog';
@@ -66,7 +64,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
   const [inputValues, setInputValues] = React.useState<
     Record<string, InputValue>
   >({});
-  const [image, setImage] = React.useState<string | null>(null);
+  const [images, setImages] = React.useState<string[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [history, setHistory] = React.useState<HistoryItem[]>([]);
@@ -79,6 +77,17 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
   const supabase = createClient();
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
+  const refreshBalance = React.useCallback(async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('token_balance')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (!error && data) {
+      setTokenBalance(data.token_balance);
+    }
+  }, [supabase, user.id]);
+
   // Sync user profile and balance
   React.useEffect(() => {
     const syncUser = async () => {
@@ -86,41 +95,21 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         id: user.id,
         email: user.email || '',
       });
-      const { data, error } = await supabase
-        .from('users')
-        .select('token_balance')
-        .eq('id', user.id)
-        .maybeSingle();
-      if (!error && data) {
-        setTokenBalance(data.token_balance);
-      }
+      await refreshBalance();
     };
     syncUser();
-  }, [supabase, user.email, user.id]);
+  }, [supabase, user.email, user.id, refreshBalance]);
 
-  // Load history
+  // Load history (server endpoint to avoid client-side writes)
   React.useEffect(() => {
     const fetchHistory = async () => {
-      const { data, error } = await supabase
-        .from('history')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setHistory(
-          data.map((item) => ({
-            id: item.id,
-            url: item.image_url,
-            prompt: item.prompt,
-            modelId: item.model_id,
-            timestamp: new Date(item.created_at).getTime(),
-          }))
-        );
-      }
+      const res = await fetch('/api/history');
+      if (!res.ok) return;
+      const json = (await res.json()) as { history?: HistoryItem[] };
+      if (json.history) setHistory(json.history);
     };
     fetchHistory();
-  }, [supabase, user.id]);
+  }, [user.id]);
 
   // Timer
   React.useEffect(() => {
@@ -187,6 +176,12 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
     const validFiles: File[] = [];
 
     for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        // Enforce image-only uploads to avoid invalid payloads
+        setError(`File "${file.name}" is not an image. Only image uploads are allowed.`);
+        alert(`File "${file.name}" is not an image. Only image uploads are allowed.`);
+        continue;
+      }
       if (file.size > MAX_SIZE) {
         // Show error immediately
         setError(`File "${file.name}" is too large. Maximum size is 50MB.`);
@@ -214,6 +209,13 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
       handleInputChange('image_url', validFiles[0]);
     }
     e.target.value = '';
+  };
+
+  const triggerHandleFileSelect = (files: FileList) => {
+    const syntheticEvent = {
+      target: { files },
+    } as unknown as React.ChangeEvent<HTMLInputElement>;
+    handleFileSelect(syntheticEvent);
   };
 
   const removeRefImage = (index: number) => {
@@ -254,6 +256,12 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
     const hasRef = getReferenceImages().length > 0;
     const modelIdToUse =
       selectedModel.editId && hasRef ? selectedModel.editId : selectedModel.id;
+    const cost = getPrice();
+
+    if (typeof tokenBalance === 'number' && cost !== null && tokenBalance < cost) {
+      setError('Not enough tokens to generate.');
+      return;
+    }
 
     const uploadReferences = async () => {
       const uploads: Record<string, string | string[] | undefined> = {};
@@ -276,7 +284,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
 
     setLoading(true);
     setError(null);
-    setImage(null);
+    setImages([]);
     setLogs([]);
 
     try {
@@ -309,29 +317,39 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
       });
 
       const parsed = result as FalResponse;
-      let imageUrl: string | undefined;
+      const urls: string[] =
+        parsed.images?.map((img) => img.url).filter(Boolean) ||
+        parsed.data?.images?.map((img) => img.url).filter(Boolean) ||
+        [];
 
-      if (parsed.images?.length) imageUrl = parsed.images[0].url;
-      else if (parsed.data?.images?.length)
-        imageUrl = parsed.data.images[0].url;
-
-      if (imageUrl) {
-        setImage(imageUrl);
-        // Optimistic History
-        const newItem: HistoryItem = {
-          id: Date.now().toString(),
-          url: imageUrl,
+      if (urls.length) {
+        setImages(urls);
+        const now = Date.now();
+        const newItems: HistoryItem[] = urls.map((url, idx) => ({
+          id: `${now}-${idx}`,
+          url,
           prompt,
           modelId: modelIdToUse,
-          timestamp: Date.now(),
-        };
-        setHistory((prev) => [newItem, ...prev]);
-        await supabase.from('history').insert({
-          user_id: user.id,
-          image_url: imageUrl,
-          prompt,
-          model_id: modelIdToUse,
+          timestamp: now,
+        }));
+        setHistory((prev) => [...newItems, ...prev]);
+        await fetch('/api/history', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            items: urls.map((url) => ({
+              imageUrl: url,
+              prompt,
+              modelId: modelIdToUse,
+              timestamp: now,
+            })),
+          }),
         });
+        void refreshBalance();
+      } else {
+        setError('No images returned from model.');
       }
     } catch (err) {
       const error = err as { body?: { detail?: string }; message?: string } | null;
@@ -349,7 +367,13 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
 
   const getPrice = () => {
     if (!selectedModel.basePriceUsd) return null;
-    return ((selectedModel.basePriceUsd * 1.2) / USD_PER_TOKEN).toFixed(2);
+    const numImages =
+      typeof inputValues['num_images'] === 'number'
+        ? Math.max(1, inputValues['num_images'] as number)
+        : 1;
+    const estimate =
+      ((selectedModel.basePriceUsd * 1.2) / USD_PER_TOKEN) * numImages;
+    return Math.max(1, Math.ceil(estimate));
   };
 
   const previewRef = (file: File | string) => {
@@ -454,44 +478,51 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                 </div>
               )}
             </div>
-          ) : image ? (
-            <div className="group relative flex h-full w-full items-center justify-center">
-              <img
-                src={image}
-                alt="Generated"
-                className="max-h-[60vh] max-w-full cursor-zoom-in rounded-2xl border border-white/5 shadow-2xl"
-                onClick={() => {
-                  setPreviewSrc(image);
-                  setPreviewOpen(true);
-                }}
-              />
-              <div className="absolute right-4 top-4 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="h-10 w-10 rounded-full border border-white/10 bg-black/60 text-white backdrop-blur hover:bg-black/80 shadow-md"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    try {
-                      const response = await fetch(image);
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.download = `visia-${Date.now()}.png`;
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      window.URL.revokeObjectURL(url);
-                    } catch (err) {
-                      console.error('Download failed:', err);
-                      window.open(image, '_blank');
-                    }
-                  }}
+          ) : images.length > 0 ? (
+            <div className="grid w-full max-w-4xl grid-cols-1 gap-4 md:grid-cols-2">
+              {images.map((img, idx) => (
+                <div
+                  key={img}
+                  className="group relative flex items-center justify-center"
                 >
-                  <Download className="h-4 w-4" />
-                </Button>
-              </div>
+                  <img
+                    src={img}
+                    alt={`Generated ${idx + 1}`}
+                    className="max-h-[60vh] w-full cursor-zoom-in rounded-2xl border border-white/5 shadow-2xl object-contain"
+                    onClick={() => {
+                      setPreviewSrc(img);
+                      setPreviewOpen(true);
+                    }}
+                  />
+                  <div className="absolute right-4 top-4 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      className="h-10 w-10 rounded-full border border-white/10 bg-black/60 text-white backdrop-blur hover:bg-black/80 shadow-md"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          const response = await fetch(img);
+                          const blob = await response.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `visia-${Date.now()}-${idx + 1}.png`;
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          window.URL.revokeObjectURL(url);
+                        } catch (err) {
+                          console.error('Download failed:', err);
+                          window.open(img, '_blank');
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="flex select-none flex-col items-center justify-center gap-4 text-zinc-700 opacity-50">
@@ -515,9 +546,7 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
           onDrop={(e) => {
             e.preventDefault();
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-              handleFileSelect({
-                target: { files: e.dataTransfer.files }
-              } as any);
+              triggerHandleFileSelect(e.dataTransfer.files);
             }
           }}
         >
@@ -612,9 +641,9 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
                   }
                   if (files.length > 0) {
                     e.preventDefault();
-                    handleFileSelect({
-                      target: { files: files as unknown as FileList }
-                    } as any);
+                    const dt = new DataTransfer();
+                    files.forEach((f) => dt.items.add(f));
+                    triggerHandleFileSelect(dt.files);
                   }
                 }}
               />
@@ -726,7 +755,13 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
               {/* Right: Generate Button */}
               <Button
                 onClick={generateImage}
-                disabled={loading || !inputValues['prompt']}
+                disabled={
+                  loading ||
+                  !inputValues['prompt'] ||
+                  (typeof tokenBalance === 'number' &&
+                    getPrice() !== null &&
+                    tokenBalance < (getPrice() as number))
+                }
                 className="h-10 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-8 font-semibold text-white shadow-lg shadow-purple-500/25 transition-all hover:shadow-purple-500/40 hover:scale-[1.02] disabled:opacity-40 disabled:shadow-none"
               >
                 {loading ? (
@@ -739,9 +774,11 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
           </div>
 
           {/* Cost estimate */}
-          <p className="mt-3 text-center text-xs text-white/40">
-            Cost estimate: ~{getPrice()} tokens
-          </p>
+          {getPrice() !== null && (
+            <p className="mt-3 text-center text-xs text-white/40">
+              Cost estimate: ~{getPrice()} tokens
+            </p>
+          )}
         </div>
       </div>
 
@@ -751,18 +788,5 @@ export function GeneratorUI({ user }: GeneratorUIProps) {
         src={previewSrc}
       />
     </main>
-  );
-}
-
-function SparklesIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className={className}
-    >
-      <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.656-1.658L13.25 18.5l1.183-.394a2.25 2.25 0 001.658-1.656l.394-1.183.394 1.183a2.25 2.25 0 001.656 1.656l1.183.394-1.183.394a2.25 2.25 0 00-1.656 1.658z" />
-    </svg>
   );
 }
