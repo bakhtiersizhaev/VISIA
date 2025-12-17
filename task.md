@@ -42,3 +42,29 @@
   - [x] Add loading skeletons and micro-animations. <!-- id: 26 -->
   - [x] Mobile responsiveness check. <!-- id: 27 -->
   - [ ] Error handling (Toasts). <!-- id: 28 -->
+
+## Phase 6: Parallel Generation & UX Improvements
+
+- [x] **Smart Image Grid** <!-- id: 29 -->
+  - [x] Implement adaptive centering (1 image = center, 2 = side-by-side, 3+ = grid) <!-- id: 30 -->
+  - [x] Add smooth animations for image appearance <!-- id: 31 -->
+
+- [x] **Parallel Generation Queue** <!-- id: 32 -->
+  - [x] Create GenerationJob interface and state management <!-- id: 33 -->
+  - [x] Refactor generateImage to support multiple concurrent jobs <!-- id: 34 -->
+  - [x] Implement job cards with progress indicators <!-- id: 35 -->
+  - [x] Add cancel button for each running job <!-- id: 36 -->
+  - [x] Set max parallel jobs limit (5) <!-- id: 37 -->
+
+- [x] **Results Feed Gallery** <!-- id: 38 -->
+  - [x] Create feed-style layout with job grouping <!-- id: 39 -->
+  - [x] Show model name + prompt for each job group <!-- id: 40 -->
+  - [x] Implement smooth scroll and animations <!-- id: 41 -->
+  - [x] Add thumbnail previews with zoom capability <!-- id: 42 -->
+
+- [x] **Compare Mode** <!-- id: 43 -->
+  - [x] Add toggle for Compare Models mode <!-- id: 44 -->
+  - [x] Implement multi-model selection with checkboxes <!-- id: 45 -->
+  - [x] Generate with multiple models in single action <!-- id: 46 -->
+  - [x] Display total cost for all selected models <!-- id: 47 -->
+

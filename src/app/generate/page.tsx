@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
-import { GeneratorUI } from '@/components/generator-ui';
+import { GeneratorUI } from '@/features/generator/components/generator-ui';
 import { Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 

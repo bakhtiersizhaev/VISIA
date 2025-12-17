@@ -7,12 +7,13 @@ export interface ModelConfig {
   basePriceUsd?: number; // base model price (fal) if known
   inputParams?: {
     name: string;
-    type: 'text' | 'number' | 'select';
+    type: 'text' | 'number' | 'select' | 'boolean';
     label: string;
     required?: boolean;
     default?: string | number | boolean | null;
     options?: string[];
-    multiple?: boolean; // New property for multi-file upload
+    multiple?: boolean;
+    description?: string;
   }[];
 }
 
@@ -26,7 +27,7 @@ export const AI_MODELS: ModelConfig[] = [
       'Fast and cost-effective generation. Edit version will be used when you add a reference image.',
     basePriceUsd: 0.004,
     inputParams: [
-      {name: 'prompt', type: 'text', label: 'Prompt', required: true},
+      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
         name: 'aspect_ratio',
         type: 'select',
@@ -68,7 +69,7 @@ export const AI_MODELS: ModelConfig[] = [
       'High-quality generation with resolution control. Edit version will be used when reference images are provided.',
     basePriceUsd: 0.008,
     inputParams: [
-      {name: 'prompt', type: 'text', label: 'Prompt', required: true},
+      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
         name: 'aspect_ratio',
         type: 'select',
@@ -101,6 +102,13 @@ export const AI_MODELS: ModelConfig[] = [
         default: 1,
       },
       {
+        name: 'enable_web_search',
+        type: 'boolean',
+        label: 'Web Search',
+        default: false,
+        description: 'Use latest web information for generation',
+      },
+      {
         name: 'image_urls',
         type: 'text',
         label: 'Reference Images (optional)',
@@ -117,7 +125,7 @@ export const AI_MODELS: ModelConfig[] = [
       "ByteDance's generation model. Edit version will be used when reference images are provided.",
     basePriceUsd: 0.012,
     inputParams: [
-      {name: 'prompt', type: 'text', label: 'Prompt', required: true},
+      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
         name: 'image_size', // Correct: Seedream uses image_size enum
         type: 'select',
@@ -149,7 +157,7 @@ export const AI_MODELS: ModelConfig[] = [
     description: 'High-fidelity visuals.',
     basePriceUsd: 0.01,
     inputParams: [
-      {name: 'prompt', type: 'text', label: 'Prompt', required: true},
+      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
       {
         name: 'aspect_ratio', // Correct: ImagineArt uses aspect_ratio
         type: 'select',
@@ -166,6 +174,45 @@ export const AI_MODELS: ModelConfig[] = [
           '2:3',
         ],
         default: '1:1',
+      },
+    ],
+  },
+  {
+    id: 'fal-ai/gpt-image-1.5',
+    editId: 'fal-ai/gpt-image-1.5/edit',
+    name: 'GPT Image 1.5',
+    type: 'text-to-image',
+    description:
+      'OpenAI GPT Image 1.5 via FAL. Strong prompt adherence, high-fidelity details.',
+    basePriceUsd: 0.02,
+    inputParams: [
+      { name: 'prompt', type: 'text', label: 'Prompt', required: true },
+      {
+        name: 'image_size',
+        type: 'select',
+        label: 'Size',
+        options: ['1024x1024', '1536x1024', '1024x1536'],
+        default: '1024x1024',
+      },
+      {
+        name: 'quality',
+        type: 'select',
+        label: 'Quality',
+        options: ['low', 'medium', 'high'],
+        default: 'high',
+      },
+      {
+        name: 'background',
+        type: 'select',
+        label: 'Background',
+        options: ['auto', 'transparent', 'opaque'],
+        default: 'auto',
+      },
+      {
+        name: 'image_urls',
+        type: 'text',
+        label: 'Reference Images (optional)',
+        multiple: true,
       },
     ],
   },

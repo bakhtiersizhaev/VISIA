@@ -1,10 +1,10 @@
-import {route} from '@fal-ai/server-proxy/nextjs';
-import {NextResponse, type NextRequest} from 'next/server';
-import {createServerClient, type CookieOptions} from '@supabase/ssr';
-import {AI_MODELS} from '@/lib/models';
+import { route } from '@fal-ai/server-proxy/nextjs';
+import { NextResponse, type NextRequest } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { AI_MODELS } from '@/lib/ai/models';
 
 const USD_PER_TOKEN = 0.01;
-type ResponseCookie = {name: string; value: string; options: CookieOptions};
+type ResponseCookie = { name: string; value: string; options: CookieOptions };
 
 async function getSupabase(req: Request) {
   let responseCookies: ResponseCookie | null = null;
@@ -21,15 +21,15 @@ async function getSupabase(req: Request) {
             ?.split('=')[1];
         },
         set(name: string, value: string, options: CookieOptions) {
-          responseCookies = {name, value, options};
+          responseCookies = { name, value, options };
         },
         remove(name: string, options: CookieOptions) {
-          responseCookies = {name, value: '', options};
+          responseCookies = { name, value: '', options };
         },
       },
     }
   );
-  return {supabase, responseCookies};
+  return { supabase, responseCookies };
 }
 
 type FalRequestBody = {
@@ -54,24 +54,24 @@ export async function POST(request: Request) {
   const cloned = request.clone();
   const body = await cloned.json().catch(() => null);
 
-  const {supabase, responseCookies} = await getSupabase(request);
+  const { supabase, responseCookies } = await getSupabase(request);
   const {
-    data: {user},
+    data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({error: 'Unauthorized'}, {status: 401});
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const cost = estimateCostTokens(body);
-  const {data: userRow, error} = await supabase
+  const { data: userRow, error } = await supabase
     .from('users')
     .select('token_balance')
     .eq('id', user.id)
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({error: 'Failed to load balance'}, {status: 500});
+    return NextResponse.json({ error: 'Failed to load balance' }, { status: 500 });
   }
 
   const balance =
@@ -80,12 +80,12 @@ export async function POST(request: Request) {
       : userRow.token_balance;
 
   if (balance < cost) {
-    return NextResponse.json({error: 'Insufficient tokens'}, {status: 402});
+    return NextResponse.json({ error: 'Insufficient tokens' }, { status: 402 });
   }
 
   await supabase
     .from('users')
-    .update({token_balance: balance - cost})
+    .update({ token_balance: balance - cost })
     .eq('id', user.id);
 
   const res = await route.POST(request as unknown as NextRequest);
@@ -94,12 +94,12 @@ export async function POST(request: Request) {
     // Refund on failure
     await supabase
       .from('users')
-      .update({token_balance: balance})
+      .update({ token_balance: balance })
       .eq('id', user.id);
   }
 
   if (responseCookies) {
-    const {name, value, options} = responseCookies as ResponseCookie;
+    const { name, value, options } = responseCookies as ResponseCookie;
     const response = NextResponse.next();
     response.cookies.set({
       name,

@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
 
 interface ImagePreviewDialogProps {
@@ -21,6 +21,10 @@ export function ImagePreviewDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="flex h-[90vh] max-w-[90vw] items-center justify-center overflow-hidden border-none bg-transparent p-0 shadow-none sm:max-w-none">
+                <DialogTitle className="sr-only">Image preview</DialogTitle>
+                <DialogDescription className="sr-only">
+                    Enlarged preview of the generated or reference image.
+                </DialogDescription>
                 <div className="relative h-full w-full flex items-center justify-center">
 
                     {/* Close button for convenience (though clicking outside works too) */}

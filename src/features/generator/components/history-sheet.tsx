@@ -12,7 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { ImagePreviewDialog } from '@/components/image-preview-dialog';
+import { ImagePreviewDialog } from '@/components/common/image-preview-dialog';
 
 export interface HistoryItem {
   id: string;
