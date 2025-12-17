@@ -31,3 +31,18 @@ ts-debug.log*
 # Agent Rules & Docs
 rules/
 docs/
+
+# IDE & Agent Settings
+.claude/
+.gemini/
+.cursor/
+.vscode/settings.json
+
+# Build artifacts
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Temporary files
+TODO-*.md
+*.tmp
+*.bak
